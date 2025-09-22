@@ -1,19 +1,10 @@
 import type { ImageManifestDescriptor } from "./image";
-import type { Env, ExposedPorts, GraphDriver, HealthCheck, If, IfOmitted, StringObject } from "./main";
+import type { Env, ExposedPorts, GraphDriver, HealthCheck, If, IfOmitted, StringObject, Ulimit } from "./global";
 
-
-export interface Ulimit {
-    /** Name of ulimit */
-    Name: string,
-    /** Soft limit */
-    Soft: number,
-    /** Hard limit */
-    Hard: number
-}
 
 export type ContainerStatus = "created" | "running" | "paused" | "restarting" | "exited" | "removing" | "dead";
 
-export interface ContainerMount<IsOnLinux extends boolean> {
+export interface ContainerMount {
     /**
      * The mount type:
      * + `bind` a mount of a file or directory from the host into the container.
@@ -41,7 +32,7 @@ export interface ContainerMount<IsOnLinux extends boolean> {
      * 
      * @see https://www.kernel.org/doc/Documentation/filesystems/sharedsubtree.txt
      */
-    Propagation: IfOmitted<IsOnLinux, string>
+    Propagation?: string
 }
 
 export interface ContainerNetwork {
@@ -123,7 +114,7 @@ export interface ContainerRestartPolicy {
 /*
  * Get containers
  */
-export interface ListContainer<IsOnLinux extends boolean> {
+export interface ContainerSummary {
     /** The ID of this container. */
     Id: string,
     /** The names associated with this container. */
@@ -166,10 +157,10 @@ export interface ListContainer<IsOnLinux extends boolean> {
         /** Summary of network-settings for each network the container is attached to. */
         Networks: ContainerNetwork
     },
-    Mounts: ContainerMount<IsOnLinux>[]
+    Mounts: ContainerMount[]
 }
 
-export interface ListFilter {
+export interface ContainerListFilter {
     ancestor: string,
     before: string,
     expose: string,
@@ -190,14 +181,14 @@ export interface ListFilter {
  * Create container
  */
 
-export interface CreateContainerOption extends CreateContainer {
+export interface CreateContainerParam {
     /** Assign the specified name to the container */
-    Name?: string,
+    name?: string,
     /** Platform in the format `os[/arch[/variant]]` used for image lookup */
-    Platform?: string,
+    platform?: string,
 }
 
-export interface CreateContainer {
+export interface CreateContainerBody {
     /** The hostname to use for the container, as a valid RFC 1123 hostname. */
     Hostname?: string,
     /** The domain name to use for the container. */
@@ -257,6 +248,8 @@ export interface CreateContainer {
     /** Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell. */
     Shell?: string[] | null,
 }
+
+export interface CreateContainerOption extends CreateContainerParam, CreateContainerBody { }
 
 export interface CreateContainerResponse {
     /** The ID of the created container. */
@@ -343,7 +336,7 @@ export interface ContainerBlkioDevice {
     Rate: number
 }
 
-export interface ContainerHostConfig<IsOnLinux extends boolean> {
+export interface ContainerHostConfig {
     /** An integer value representing this container's relative CPU weight versus other containers. */
     CpuShares: number,
     /** Memory limit in bytes. */
@@ -410,17 +403,17 @@ export interface ContainerHostConfig<IsOnLinux extends boolean> {
      * 
      * On Windows Server containers, the processor resource controls are mutually exclusive. The order of precedence is CPUCount first, then CPUShares, and CPUPercent last.
      */
-    CpuCount: If<IsOnLinux, undefined, number>,
+    CpuCount?: number,
     /** 
      * The usable percentage of the available CPUs (Windows only).
      * 
      * On Windows Server containers, the processor resource controls are mutually exclusive. The order of precedence is CPUCount first, then CPUShares, and CPUPercent last.
      */
-    CpuPercent: If<IsOnLinux, undefined, number>,
+    CpuPercent?: number,
     /** Maximum IOps for the container system drive (Windows only) */
-    IOMaximumIOps: If<IsOnLinux, undefined, number>,
+    IOMaximumIOps?: number,
     /** Maximum IO in bytes per second for the container system drive (Windows only). */
-    IOMaximumBandwidth: If<IsOnLinux, undefined, number>,
+    IOMaximumBandwidth?: number,
     /**
      * A list of volume bindings for this container. Each volume binding is a string in one of these forms:
      * + `host-src:container-dest[:options]` to bind-mount a host path into the container. Both host-src, and container-dest must be an absolute path.
@@ -628,7 +621,7 @@ export interface ContainerHostConfig<IsOnLinux extends boolean> {
     /** Runtime to use with this container. */
     Runtime: string | null,
     /** Isolation technology of the container. (Windows only) */
-    Isolation: If<IsOnLinux, undefined, "default" | "process" | "hyperv" | "">,
+    Isolation?: "default" | "process" | "hyperv" | "",
     /** The list of paths to be masked inside the container (this overrides the default set of paths). */
     MaskedPaths: string[],
     /** The list of paths to be set as read-only inside the container (this overrides the default set of paths). */
@@ -636,7 +629,7 @@ export interface ContainerHostConfig<IsOnLinux extends boolean> {
 }
 
 
-export interface ContainerConfig<IsOnLinux extends boolean> {
+export interface ContainerConfig {
     /** The hostname to use for the container, as a valid RFC 1123 hostname. */
     Hostname: string,
     /** 
@@ -688,7 +681,7 @@ export interface ContainerConfig<IsOnLinux extends boolean> {
         StartInterval: number
     },
     /** Command is already escaped (Windows only) */
-    ArgsEscaped: If<IsOnLinux, undefined, boolean | null>,
+    ArgsEscaped?: boolean | null,
     /** The name (or reference) of the image to use when creating the container, or which was used when the container was created. */
     Image: string,
     /** An object mapping mount point paths inside the container to empty objects. */
@@ -826,7 +819,7 @@ export interface ContainerNetworkSettings {
     Network: ContainerNetwork
 }
 
-export interface InspectContainer<IsOnLinux extends boolean> {
+export interface InspectContainer {
     /** The ID of this container as a 128-bit (64-character) hexadecimal string (32 bytes). */
     Id: string,
     /** 
@@ -898,7 +891,7 @@ export interface InspectContainer<IsOnLinux extends boolean> {
     /** IDs of exec instances that are running in the container. */
     ExecIDs: string[] | null,
     /** Container configuration that depends on the host we are running on */
-    HostConfig: ContainerHostConfig<IsOnLinux>,
+    HostConfig: ContainerHostConfig,
     /** Information about the storage driver used to store the container's and image's filesystem. */
     GraphDriver: GraphDriver,
     /** 
@@ -914,9 +907,9 @@ export interface InspectContainer<IsOnLinux extends boolean> {
      */
     SizeRootFs: number | null,
     /** List of mounts used by the container. */
-    Mounts: ContainerMount<IsOnLinux>[],
+    Mounts: ContainerMount[],
     /** Configuration for a container that is portable between hosts. */
-    Config: ContainerConfig<IsOnLinux>,
+    Config: ContainerConfig,
     /** NetworkSettings exposes the network settings in the API. */
     NetworkSettings: ContainerNetworkSettings,
 }
@@ -924,7 +917,7 @@ export interface InspectContainer<IsOnLinux extends boolean> {
 /*
  * Container process
  */
-export interface Process {
+export interface ContainerProcess {
     /** The ps column titles */
     Titles: string[],
     /** Each process running in the container, where each process is an array of values corresponding to the titles. */
@@ -934,7 +927,7 @@ export interface Process {
 /*
  * Container filesystem change
  */
-export interface FilesystemChange {
+export interface ContainerFilesystemChange {
     /** Path to file or directory that has changed. */
     Path: string,
     /** 
@@ -949,16 +942,16 @@ export interface FilesystemChange {
 /*
  * Container usage
  */
-export interface BlkioStat {
+export interface ContainerBlkioStat {
     major: number,
     minor: number,
     op: number,
     value: number
 }
 
-export type BlkioStatMaybeOmmited = (BlkioStat | null)[] | null | undefined
+export type ContainerBlkioStatMaybeOmmited = (ContainerBlkioStat | null)[] | null | undefined
 
-export interface CpuStats<IsOnLinux extends boolean> {
+export interface ContainerCpuStats {
     /** All CPU stats aggregated since container inception. */
     cpu_usage: {
         /** Total CPU time consumed in nanoseconds (Linux) or 100's of nanoseconds (Windows). */
@@ -968,7 +961,7 @@ export interface CpuStats<IsOnLinux extends boolean> {
          *
          * This field is Linux-specific when using cgroups v1. It is omitted when using cgroups v2 and Windows containers.
          */
-        percpu_usage: IfOmitted<IsOnLinux, number[] | null>,
+        percpu_usage?: number[] | null,
         /** 
          * Time (in nanoseconds) spent by tasks of the cgroup in kernel mode (Linux), or time spent (in 100's of nanoseconds) by all container processes in kernel mode (Windows).
          *
@@ -987,29 +980,29 @@ export interface CpuStats<IsOnLinux extends boolean> {
      *
      * This field is Linux-specific and omitted for Windows containers.
      */
-    system_cpu_usage: IfOmitted<IsOnLinux, number | null>,
+    system_cpu_usage?: number | null,
     /** 
      * Number of online CPUs.
      *
      * This field is Linux-specific and omitted for Windows containers.
      */
-    online_cpus: IfOmitted<IsOnLinux, number | null>,
+    online_cpus?: number | null,
     /** 
      * CPU throttling stats of the container.
      *
      * This type is Linux-specific and omitted for Windows containers.
      */
-    throttling_data: IfOmitted<IsOnLinux, {
+    throttling_data?:{
         /** Number of periods with throttling active. */
         periods: number,
         /** Number of periods when the container hit its throttling limit. */
         throttled_periods: number,
         /** Aggregated time (in nanoseconds) the container was throttled for. */
         throttled_time: number
-    } | null>,
+    } | null,
 }
 
-export interface ContainerUsage<IsOnLinux extends boolean> {
+export interface ContainerUsage {
     /** Name of the container. */
     name: string,
     /** ID of the container. */
@@ -1029,12 +1022,12 @@ export interface ContainerUsage<IsOnLinux extends boolean> {
      *
      * This type is Linux-specific and omitted for Windows containers.
      */
-    pids_stats: IfOmitted<IsOnLinux, {
+    pids_stats?: {
         /** Current is the number of PIDs in the cgroup. */
         current: number | null,
         /** Limit is the hard limit on the number of pids in the cgroup. A "Limit" of 0 means that there is no limit. */
         limit: number | null,
-    }>,
+    },
     /** 
      * BlkioStats stores all IO service stats for data read and write.
      * 
@@ -1044,43 +1037,43 @@ export interface ContainerUsage<IsOnLinux extends boolean> {
      */
     blkio_stats: {
         /** Array of objects or null (ContainerBlkioStatEntry) */
-        io_service_bytes_recursive: BlkioStat[] | null,
+        io_service_bytes_recursive: ContainerBlkioStat[] | null,
         /** This field is only available when using Linux containers with cgroups v1. It is omitted or null when using cgroups v2. */
-        io_serviced_recursive: BlkioStatMaybeOmmited,
+        io_serviced_recursive: ContainerBlkioStatMaybeOmmited,
         /** This field is only available when using Linux containers with cgroups v1. It is omitted or null when using cgroups v2. */
-        io_queue_recursive: BlkioStatMaybeOmmited,
+        io_queue_recursive: ContainerBlkioStatMaybeOmmited,
         /** This field is only available when using Linux containers with cgroups v1. It is omitted or null when using cgroups v2. */
-        io_service_time_recursive: BlkioStatMaybeOmmited,
+        io_service_time_recursive: ContainerBlkioStatMaybeOmmited,
         /** This field is only available when using Linux containers with cgroups v1. It is omitted or null when using cgroups v2. */
-        io_wait_time_recursive: BlkioStatMaybeOmmited,
+        io_wait_time_recursive: ContainerBlkioStatMaybeOmmited,
         /** This field is only available when using Linux containers with cgroups v1. It is omitted or null when using cgroups v2. */
-        io_merged_recursive: BlkioStatMaybeOmmited,
+        io_merged_recursive: ContainerBlkioStatMaybeOmmited,
         /** This field is only available when using Linux containers with cgroups v1. It is omitted or null when using cgroups v2. */
-        io_time_recursive: BlkioStatMaybeOmmited,
+        io_time_recursive: ContainerBlkioStatMaybeOmmited,
         /** This field is only available when using Linux containers with cgroups v1. It is omitted or null when using cgroups v2. */
-        sectors_recursive: BlkioStatMaybeOmmited
+        sectors_recursive: ContainerBlkioStatMaybeOmmited
     } | null,
     /** 
      * The number of processors on the system.
      *
      * This field is Windows-specific and always zero for Linux containers.
      */
-    num_procs: If<IsOnLinux, 0, number>,
+    num_procs: number,
     /** 
      * StorageStats is the disk I/O stats for read/write on Windows.
      *
      * This type is Windows-specific and omitted for Linux containers.
      */
-    storage_stats: If<IsOnLinux, undefined, {
+    storage_stats?:{
         read_count_normalized: number | null,
         read_size_bytes: number | null,
         write_count_normalized: number | null,
         write_size_bytes: number | null,
-    } | null>,
+    } | null,
     /** CPU related info of the container */
-    cpu_stats: CpuStats<IsOnLinux> | null,
+    cpu_stats: ContainerCpuStats | null,
     /** CPU related info of the container */
-    precpu_stats: CpuStats<IsOnLinux> | null,
+    precpu_stats: ContainerCpuStats | null,
     /** Aggregates all memory stats since container inception on Linux. Windows returns stats for commit and private working set only. */
     memory_stats: {
         /** 
@@ -1088,93 +1081,91 @@ export interface ContainerUsage<IsOnLinux extends boolean> {
          *
          * This field is Linux-specific and omitted for Windows containers.
          */
-        usage: IfOmitted<IsOnLinux, number | null>,
+        usage?: number | null,
         /** 
          * Maximum usage ever recorded.
          *
          * This field is Linux-specific and only supported on cgroups v1. It is omitted when using cgroups v2 and for Windows containers.
          */
-        max_usage: IfOmitted<IsOnLinux, number | null>,
+        max_usage?: number | null,
         /**
          * All the stats exported via memory.stat. when using cgroups v2.
          *
          * This field is Linux-specific and omitted for Windows containers.
          */
-        stats: IfOmitted<IsOnLinux, Record<string, number | null>>,
+        stats?: Record<string, number | null>,
         /** 
          * Number of times memory usage hits limits.
          *
          * This field is Linux-specific and only supported on cgroups v1. It is omitted when using cgroups v2 and for Windows containers. 
          */
-        failcnt: IfOmitted<IsOnLinux, number | null>,
+        failcnt?: number | null,
         /** This field is Linux-specific and omitted for Windows containers. */
-        limit: IfOmitted<IsOnLinux, number | null>,
+        limit?: number | null,
         /** This field is Windows-specific and omitted for Linux containers. */
-        commitbytes: If<IsOnLinux, undefined, number | null>,
+        commitbytes?: number | null,
         /** 
          * Peak committed bytes.
          * 
          * This field is Windows-specific and omitted for Linux containers.
          */
-        commitpeakbytes: If<IsOnLinux, undefined, number | null>,
+        commitpeakbytes?: number | null,
         /** 
          * Private working set.
          *
          * This field is Windows-specific and omitted for Linux containers.
          */
-        privateworkingset: If<IsOnLinux, undefined, number | null>
+        privateworkingset?: number | null
     },
     /** 
      * Network statistics for the container per interface.
      * 
      * This field is omitted if the container has no networking enabled.
      */
-    networks: {
-        [name: string]: {
-            /** Bytes received. Windows and Linux. */
-            rx_bytes: number,
-            /** Packets received. Windows and Linux. */
-            rx_packets: number,
-            /** 
-             * Received errors. Not used on Windows.
-             *
-             * This field is Linux-specific and always zero for Windows containers.
-             */
-            rx_errors: IfOmitted<IsOnLinux, number>,
-            /** Incoming packets dropped. Windows and Linux. */
-            rx_dropped: number,
-            /** Bytes sent. Windows and Linux. */
-            tx_bytes: number,
-            /** Packets sent. Windows and Linux. */
-            tx_packets: number,
-            /** 
-             * Sent errors. Not used on Windows.
-             *
-             * This field is Linux-specific and always zero for Windows containers.
-             */
-            tx_errors: IfOmitted<IsOnLinux, number>,
-            /** Outgoing packets dropped. Windows and Linux. */
-            tx_dropped: number,
-            /** 
-             * Endpoint ID. Not used on Linux.
-             *
-             * This field is Windows-specific and omitted for Linux containers
-             */
-            endpoint_id: IfOmitted<IsOnLinux, string | null>,
-            /** 
-             * Instance ID. Not used on Linux.
-             *
-             * This field is Windows-specific and omitted for Linux containers.
-             */
-            instance_id: IfOmitted<IsOnLinux, string | null>
-        } | null
-    } | null
+    networks: Record<string, {
+        /** Bytes received. Windows and Linux. */
+        rx_bytes: number,
+        /** Packets received. Windows and Linux. */
+        rx_packets: number,
+        /** 
+         * Received errors. Not used on Windows.
+         *
+         * This field is Linux-specific and always zero for Windows containers.
+         */
+        rx_errors?: number,
+        /** Incoming packets dropped. Windows and Linux. */
+        rx_dropped: number,
+        /** Bytes sent. Windows and Linux. */
+        tx_bytes: number,
+        /** Packets sent. Windows and Linux. */
+        tx_packets: number,
+        /** 
+         * Sent errors. Not used on Windows.
+         *
+         * This field is Linux-specific and always zero for Windows containers.
+         */
+        tx_errors?: number,
+        /** Outgoing packets dropped. Windows and Linux. */
+        tx_dropped: number,
+        /** 
+         * Endpoint ID. Not used on Linux.
+         *
+         * This field is Windows-specific and omitted for Linux containers
+         */
+        endpoint_id?: string | null,
+        /** 
+         * Instance ID. Not used on Linux.
+         *
+         * This field is Windows-specific and omitted for Linux containers.
+         */
+        instance_id?: string | null
+    } | null> | null
 }
 
 /*
  * Update container
  */
-export interface UpdateOption<IsOnLinux extends boolean> {
+export interface ContainerUpdateOption {
     /** An integer value representing this container's relative CPU weight versus other containers. */
     CpuShares?: number,
     /** Memory limit in bytes. */
@@ -1241,17 +1232,17 @@ export interface UpdateOption<IsOnLinux extends boolean> {
      * 
      * On Windows Server containers, the processor resource controls are mutually exclusive. The order of precedence is CPUCount first, then CPUShares, and CPUPercent last.
      */
-    CpuCount?: If<IsOnLinux, undefined, number>,
+    CpuCount?: number,
     /** 
      * The usable percentage of the available CPUs (Windows only).
      * 
      * On Windows Server containers, the processor resource controls are mutually exclusive. The order of precedence is CPUCount first, then CPUShares, and CPUPercent last.
      */
-    CpuPercent?: If<IsOnLinux, undefined, number>,
+    CpuPercent?: number,
     /** Maximum IOps for the container system drive (Windows only) */
-    IOMaximumIOps?: If<IsOnLinux, undefined, number>,
+    IOMaximumIOps?: number,
     /** Maximum IO in bytes per second for the container system drive (Windows only). */
-    IOMaximumBandwidth?: If<IsOnLinux, undefined, number>,
+    IOMaximumBandwidth?: number,
     /** 
      * The behavior to apply when the container exits. The default is not to restart.
      *
@@ -1260,14 +1251,14 @@ export interface UpdateOption<IsOnLinux extends boolean> {
     RestartPolicy?: ContainerRestartPolicy,
 }
 
-export interface UpdateResponse {
+export interface ContainerUpdateResponse {
     Warnings: string
 }
 
 /*
  * Wait container
  */
-export interface Wait {
+export interface WaitContainerResponse {
     StatusCode: number,
     Error: {
         Message: string
@@ -1277,12 +1268,12 @@ export interface Wait {
 /*
  * Prune container
  */
-export interface PruneFilter {
+export interface PruneContainerFilter {
     until: string,
     label: string[]
 }
 
-export interface Prune {
+export interface PruneContainer {
     ContainersDeleted: string[],
     SpaceReclaimed: number
 }

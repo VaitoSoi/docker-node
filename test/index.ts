@@ -1,15 +1,8 @@
-import axios from "axios";
-import { Container } from "../src/components/container";
+import DockerClient from "../src/client";
 
-const api = axios.create({
-    baseURL: "http://127.0.0.1:2375",
-    // socketPath: "/var/run/docker.sock",
-});
-const container = new Container(api);
-
-main().catch(console.error);
+main()
 async function main() {
-    // console.log(await container.list());
-    const stream = await container.logs("4a226cdc39af", { stream: true, logs: true, stdout: true });
-    stream.on('data', (buffer: Buffer) => console.log(buffer.toString()));
+    const client = await DockerClient.fromEnv({ version: "1.50", suppressWarning: true });
+    if (!client) return console.log("client not found");
+    console.log(await client.systems.version());
 }

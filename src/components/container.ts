@@ -1,23 +1,24 @@
-import { AxiosError, type AxiosInstance } from "axios";
+import axios, { type AxiosInstance } from "axios";
 import type {
     InspectContainer,
-    CreateContainer,
+    CreateContainerBody,
     CreateContainerOption,
     CreateContainerResponse,
-    ListFilter,
-    FilesystemChange,
+    ContainerListFilter,
+    ContainerFilesystemChange,
     ContainerUsage,
-    UpdateOption,
-    UpdateResponse,
-    PruneFilter,
-    Prune,
-    ListContainer
+    ContainerUpdateOption,
+    ContainerUpdateResponse,
+    PruneContainerFilter,
+    PruneContainer,
+    ContainerSummary,
+    CreateContainerParam
 } from "../typing/container";
 import {
     APIError,
     BadParameter,
     Conflict,
-    ContainerNameIsUsed,
+    NameIsUsed,
     ContainerNotFound,
     ContainerNotRunning,
     ContainerOrPathNotFound,
@@ -26,11 +27,11 @@ import {
     ReadOnlyPath
 } from "../lib/error";
 import fs from "node:fs";
-import { Duplex } from "node:stream";
 import http from "node:http";
-import type { Socket } from "node:net";
+import { objectToQuery } from "../lib/utils";
+import { DockerStream } from "../lib/stream";
 
-export class Container<IsOnLinux extends boolean> {
+export class Container {
     constructor(private api: AxiosInstance) { }
 
     /**
@@ -47,23 +48,15 @@ export class Container<IsOnLinux extends boolean> {
         /** Return the size of container as fields `SizeRw` and `SizeRootFs` */
         size?: boolean,
         /** Filters to process on the container list */
-        filter?: ListFilter
-    }): Promise<ListContainer<IsOnLinux>[]> {
-        options ||= {};
-        options.all ||= false;
-        options.size ||= false;
-
+        filter?: ContainerListFilter
+    }): Promise<ContainerSummary[]> {
         try {
-            const response = await this.api.get<ListContainer<IsOnLinux>[]>(
-                "/v1.51/containers/json?" +
-                `all=${options.all}&` +
-                (options.limit ? `limit=${options.limit}&` : '') +
-                `size=${options.size}&` +
-                (options.filter ? JSON.stringify(options.filter) : "")
+            const response = await this.api.get<ContainerSummary[]>(
+                "/containers/json?" + objectToQuery(options || {})
             );
             return response.data;
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 400)
                     throw new BadParameter(message);
@@ -81,10 +74,14 @@ export class Container<IsOnLinux extends boolean> {
      * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Container/operation/ContainerCreate
      */
     public async create(option: CreateContainerOption): Promise<CreateContainerResponse> {
-        if (option.Name && !/^\/?[a-zA-Z0-9][a-zA-Z0-9_.-]+$/.test(option.Name))
-            throw new InvalidContainerName(option.Name);
+        if (option.name && !/^\/?[a-zA-Z0-9][a-zA-Z0-9_.-]+$/.test(option.name))
+            throw new InvalidContainerName(option.name);
 
-        const body: CreateContainer = {
+        const queryParam: CreateContainerParam = {
+            name: option.name,
+            platform: option.platform
+        };
+        const body: CreateContainerBody = {
             Hostname: option.Hostname,
             Domainname: option.Domainname,
             User: option.User,
@@ -120,15 +117,13 @@ export class Container<IsOnLinux extends boolean> {
         };
 
         try {
-            const response = await this.api.put<CreateContainerResponse>(
-                "/v1.51/containers/create?" +
-                (option.Name ? `name=${option.Name}&` : "") +
-                (option.Platform ? `platform=${option.Platform}` : ""),
+            const response = await this.api.post<CreateContainerResponse>(
+                "/containers/create?" + objectToQuery(queryParam),
                 body
             );
             return response.data;
-        } catch (error) {
-            if (error instanceof AxiosError) {
+        } catch (error: any) {
+            if (error.response) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 400)
                     throw new BadParameter(message);
@@ -152,12 +147,12 @@ export class Container<IsOnLinux extends boolean> {
     public async inspect(
         id: string,
         size: boolean = false,
-    ): Promise<InspectContainer<IsOnLinux>> {
+    ): Promise<InspectContainer> {
         try {
-            const response = await this.api.get<InspectContainer<IsOnLinux>>(`/v1.51/containers/${id}/json?size=${size}`);
+            const response = await this.api.get<InspectContainer>(`/containers/${id}/json?` + objectToQuery({ size }));
             return response.data;
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 404)
                     throw new ContainerNotFound(id);
@@ -177,10 +172,10 @@ export class Container<IsOnLinux extends boolean> {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public async top(id: string, ps_args: string = "-ef") {
         try {
-            const response = await this.api.get(`/v1.51/containers/${id}/top?ps_args=${ps_args}`);
+            const response = await this.api.get(`/containers/${id}/top?` + objectToQuery({ ps_args }));
             return response.data;
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 404)
                     throw new ContainerNotFound(id);
@@ -196,12 +191,12 @@ export class Container<IsOnLinux extends boolean> {
      * @param id ID or name of the container
      * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Container/operation/ContainerChanges
      */
-    public async getFilesystemChanges(id: string): Promise<FilesystemChange> {
+    public async getFilesystemChanges(id: string): Promise<ContainerFilesystemChange> {
         try {
-            const response = await this.api.get<FilesystemChange>(`/v1.51/containers/${id}/changes`);
+            const response = await this.api.get<ContainerFilesystemChange>(`/containers/${id}/changes`);
             return response.data;
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 404)
                     throw new ContainerNotFound(id);
@@ -220,18 +215,18 @@ export class Container<IsOnLinux extends boolean> {
      */
     public async export(id: string, path: string) {
         try {
-            const reponse = await this.api.get(`/v1.51/containers/${id}/export`, { responseType: "stream" });
-            const fileWriteStream = fs.createWriteStream(path);
-            reponse.data.pipe(fileWriteStream);
+            const reponse = await this.api.get(`/containers/${id}/export`, { responseType: "stream" });
+            const writeStream = fs.createWriteStream(path);
+            reponse.data.pipe(writeStream);
             return new Promise<void>((resolve, reject) => {
-                fileWriteStream.once('close', resolve);
-                fileWriteStream.once('error', (error) => {
-                    fileWriteStream.close();
+                writeStream.once('close', resolve);
+                writeStream.once('error', (error) => {
+                    writeStream.close();
                     reject(error);
                 });
             });
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 404)
                     throw new ContainerNotFound(id);
@@ -247,12 +242,12 @@ export class Container<IsOnLinux extends boolean> {
      * @param id ID or name of the container
      * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Container/operation/ContainerStats
      */
-    public async stats(id: string): Promise<ContainerUsage<IsOnLinux>> {
+    public async stats(id: string): Promise<ContainerUsage> {
         try {
-            const response = await this.api.get<ContainerUsage<IsOnLinux>>(`/v1.51/containers/${id}/stats`);
+            const response = await this.api.get<ContainerUsage>(`/containers/${id}/stats`);
             return response.data;
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 404)
                     throw new ContainerNotFound(id);
@@ -271,9 +266,9 @@ export class Container<IsOnLinux extends boolean> {
      */
     public async start(id: string) {
         try {
-            await this.api.post(`/v1.51/containers/${id}/start`);
+            await this.api.post(`/containers/${id}/start`);
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 if (error.status == 304)
                     return;
 
@@ -298,12 +293,10 @@ export class Container<IsOnLinux extends boolean> {
     public async stop(id: string, option?: { signal?: string, timeout?: number }) {
         try {
             await this.api.post(
-                `/v1.51/containers/${id}/stop?` +
-                (option?.signal ? `signal=${option?.signal}&` : '') +
-                (option?.timeout ? `t=${option?.timeout}` : '')
+                `/containers/${id}/stop?` + objectToQuery(option || {}, { "timeout": "t" })
             );
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 if (error.status == 304)
                     return;
 
@@ -333,12 +326,10 @@ export class Container<IsOnLinux extends boolean> {
     }) {
         try {
             await this.api.post(
-                `/v1.51/containers/${id}/restart?` +
-                (option?.signal ? `signal=${option?.signal}&` : '') +
-                (option?.timeout ? `t=${option?.timeout}` : '')
+                `/containers/${id}/restart?` + objectToQuery(option || {}, { timeout: "t" })
             );
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 404)
                     throw new ContainerNotFound(id);
@@ -359,11 +350,10 @@ export class Container<IsOnLinux extends boolean> {
     public async kill(id: string, signal?: string) {
         try {
             await this.api.post(
-                `/v1.51/containers/${id}/kill?` +
-                (signal ? `signal=${signal}&` : '')
+                `/containers/${id}/kill?` + objectToQuery({ signal })
             );
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 404)
                     throw new ContainerNotFound(id);
@@ -382,12 +372,12 @@ export class Container<IsOnLinux extends boolean> {
      * @param option 
      * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Container/operation/ContainerUpdate
      */
-    public async update(id: string, option: UpdateOption<IsOnLinux>): Promise<UpdateResponse> {
+    public async update(id: string, option: ContainerUpdateOption): Promise<ContainerUpdateResponse> {
         try {
-            const response = await this.api.post<UpdateResponse>(`/v1.51/containers/${id}/update`, option);
+            const response = await this.api.post<ContainerUpdateResponse>(`/containers/${id}/update`, option);
             return response.data;
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 404)
                     throw new ContainerNotFound(id);
@@ -407,14 +397,14 @@ export class Container<IsOnLinux extends boolean> {
      */
     public async rename(id: string, newName: string) {
         try {
-            await this.api.post(`/v1.51/containers/${id}/rename?name=${newName}&`);
+            await this.api.post(`/containers/${id}/rename?` + objectToQuery({ name: newName }));
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 404)
                     throw new ContainerNotFound(id);
                 else if (error.status == 409)
-                    throw new ContainerNameIsUsed(newName);
+                    throw new NameIsUsed(newName);
                 else if (error.status == 500)
                     throw new APIError(message);
             }
@@ -432,9 +422,9 @@ export class Container<IsOnLinux extends boolean> {
      */
     public async pause(id: string) {
         try {
-            await this.api.post(`/v1.51/containers/${id}/pause`);
+            await this.api.post(`/containers/${id}/pause`);
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 404)
                     throw new ContainerNotFound(id);
@@ -452,9 +442,9 @@ export class Container<IsOnLinux extends boolean> {
      */
     public async unpause(id: string) {
         try {
-            await this.api.post(`/v1.51/containers/${id}/unpause`);
+            await this.api.post(`/containers/${id}/unpause`);
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 404)
                     throw new ContainerNotFound(id);
@@ -473,9 +463,9 @@ export class Container<IsOnLinux extends boolean> {
      */
     public async wait(id: string, condition: "not-running" | "next-exit" | "removed" = "not-running") {
         try {
-            await this.api.post(`/v1.51/containers/${id}/wait?condition=${condition}`, {}, { timeout: 0 });
+            await this.api.post(`/containers/${id}/wait?` + objectToQuery({ condition }), {}, { timeout: 0 });
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 404)
                     throw new ContainerNotFound(id);
@@ -503,13 +493,10 @@ export class Container<IsOnLinux extends boolean> {
     }) {
         try {
             await this.api.delete(
-                `/v1.51/containers/${id}&` +
-                (option?.volume ? `v=${option.volume}&` : "") +
-                (option?.force ? `force=${option.force}&` : "") +
-                (option?.link ? `link=${option.link}` : "")
+                `/containers/${id}?` + objectToQuery(option || {}, { volume: "v" })
             );
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 400)
                     throw new BadParameter(message);
@@ -532,12 +519,12 @@ export class Container<IsOnLinux extends boolean> {
      */
     public async pathStat(id: string, path: string): Promise<object> {
         try {
-            const response = await this.api.head(`/v1.51/containers/${id}/archive?path=${path}`);
+            const response = await this.api.head(`/containers/${id}/archive?` + objectToQuery({ path }));
             const rawData = response.headers["X-Docker-Container-Path-Stat"];
             const decodedData = Buffer.from(rawData, "base64").toString();
             return JSON.parse(decodedData);
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 400)
                     throw new BadParameter(message);
@@ -553,17 +540,20 @@ export class Container<IsOnLinux extends boolean> {
     /**
      * Get a tar archive of a resource in the filesystem of container id.
      * @param id ID or name of the container
-     * @param containerPath Resource in the container’s filesystem to archive.
-     * @param outputPath Where to save the tar file
      * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Container/operation/ContainerArchive
      */
-    public async archive(id: string, containerPath: string, outputPath: string) {
+    public async archive(id: string, option: {
+        /** Resource in the container’s filesystem to archive. */
+        containerPath: string,
+        /** Where to save the tar file */
+        outputPath: string
+    }) {
         try {
             const reponse = await this.api.get(
-                `/v1.51/containers/${id}/archive?path=${containerPath}`,
+                `/containers/${id}/archive?` + objectToQuery({ path: option.containerPath }),
                 { responseType: "stream" }
             );
-            const fileWriteStream = fs.createWriteStream(outputPath);
+            const fileWriteStream = fs.createWriteStream(option.outputPath);
             reponse.data.pipe(fileWriteStream);
             return new Promise<void>((resolve, reject) => {
                 fileWriteStream.once('close', resolve);
@@ -573,7 +563,7 @@ export class Container<IsOnLinux extends boolean> {
                 });
             });
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 400)
                     throw new BadParameter(message);
@@ -589,15 +579,15 @@ export class Container<IsOnLinux extends boolean> {
     /**
      * Upload a tar archive to be extracted to a path in the filesystem of container id. `path` parameter is asserted to be a directory. If it exists as a file, 400 error will be returned with message "not a directory".
      * @param id ID or name of the container
-     * @param inputPath Where to pick the directory
-     * @param containerPath Path to a directory in the container to extract the archive’s contents into.
      * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Container/operation/PutContainerArchive
      */
     public async upload(
         id: string,
-        inputPath: string,
-        containerPath: string,
         option: {
+            /** Where to pick the directory */
+            inputPath: string,
+            /** Path to a directory in the container to extract the archive’s contents into. */
+            containerPath: string,
             /** If `true` then it will be an error if unpacking the given content would cause an existing directory to be replaced with a non-directory and vice versa. */
             noOverwriteDirNonDir: boolean,
             /** If `true` then it will copy UID/GID maps to the dest file or dir */
@@ -605,16 +595,14 @@ export class Container<IsOnLinux extends boolean> {
         }
     ) {
         try {
-            const inputFileStream = fs.createReadStream(inputPath);
+            const inputFileStream = fs.createReadStream(option.inputPath);
             await this.api.put(
-                `/v1.51/containers/${id}/archive?path=${containerPath}&` +
-                (option.copyUIDGID ? `copyUIDGID=${option.copyUIDGID}&` : '') +
-                (option.noOverwriteDirNonDir ? `noOverwriteDirNonDir=${option.noOverwriteDirNonDir}` : ''),
+                `/containers/${id}/archive?` + objectToQuery({ ...option }, { containerPath: 'path' }, [], ['inputPath']),
                 inputFileStream,
                 { headers: { "Content-Type": "application/octet-stream" } }
             );
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 400)
                     throw new BadParameter(message);
@@ -634,15 +622,14 @@ export class Container<IsOnLinux extends boolean> {
      * @param filters Filters
      * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Container/operation/ContainerPrune
      */
-    public async prune(filters?: PruneFilter): Promise<Prune> {
+    public async prune(filters?: PruneContainerFilter): Promise<PruneContainer> {
         try {
-            const response = await this.api.post<Prune>(
-                `/v1.51/containers/prune?` +
-                (filters ? `filter=${JSON.stringify(filters)}` : '')
+            const response = await this.api.post<PruneContainer>(
+                `/containers/prune?` + objectToQuery({ filters }, {}, ["filters"])
             );
             return response.data;
         } catch (error) {
-            if (error instanceof AxiosError) {
+            if (axios.isAxiosError(error)) {
                 const message = error.response?.data.message || error.message;
                 if (error.status == 500)
                     throw new APIError(message);
@@ -657,7 +644,7 @@ export class Container<IsOnLinux extends boolean> {
      * @param option
      * @returns 
      */
-    public async logs(id: string, option?: {
+    public async attach(id: string, option: {
         /** 
          * Replay previous logs from the container.
          *
@@ -665,24 +652,19 @@ export class Container<IsOnLinux extends boolean> {
          *
          * If stream is also enabled, once all the previous output has been returned, it will seamlessly transition into streaming current output.
          */
-        logs?: boolean,
+        logs: boolean,
         /** Stream attached streams from the time the request was made onwards. */
-        stream?: boolean,
+        stream: boolean,
         /** Attach to stdin */
         stdin?: boolean,
         /** Attach to stdout */
-        stdout?: boolean,
+        stdout: boolean,
         /** Attach to stderr */
         stderr?: boolean
-    }): Promise<ContainerLogs> {
-        return new Promise<ContainerLogs>((resolve, reject) => {
+    }): Promise<DockerStream> {
+        return new Promise<DockerStream>((resolve, reject) => {
             const request = http.request(
-                `${this.api.defaults.baseURL || ""}/v1.51/containers/${id}/attach?` +
-                (option?.logs ? `logs=${option.logs}&` : '') +
-                (option?.stream ? `stream=${option.stream}&` : '') +
-                (option?.stdin ? `stdin=${option.stdin}&` : '') +
-                (option?.stdout ? `stdout=${option.stdout}&` : '') +
-                (option?.stderr ? `stderr=${option.stderr}` : ''),
+                `${this.api.defaults.baseURL || ""}/v1.51/containers/${id}/attach?` + objectToQuery(option || {}),
                 {
                     socketPath: this.api.defaults.socketPath || undefined,
                     method: "POST",
@@ -699,74 +681,10 @@ export class Container<IsOnLinux extends boolean> {
                 )
                     reject("wrong upgrade :(");
 
-                return resolve(new ContainerLogs(socket));
+                return resolve(new DockerStream(socket));
             });
             request.on("error", reject);
             request.end();
         });
     }
 }
-
-/* eslint-disable @typescript-eslint/naming-convention */
-class ContainerLogs extends Duplex {
-    private buffer: Buffer;
-
-    constructor(private socket: Socket) {
-        super();
-        this.buffer = Buffer.alloc(0);
-
-        socket.on('data', this._data.bind(this));
-        socket.on("end", () => this.push(null));
-        socket.on("error", (err) => this.destroy(err));
-    }
-
-    private _data(chunk: Buffer) {
-        this.buffer = Buffer.concat([this.buffer, chunk], this.buffer.length + chunk.length);
-
-        while (this.buffer.length >= 8) {
-            const type = this.buffer.at(0);
-            const length = this.buffer.readUInt32BE(4);
-            if (this.buffer.length < 8 + length) break;
-
-            const data = this.buffer.subarray(8, length + 8);
-            this.push(data);
-            if (type == 0)
-                this.emit("stdin", data);
-            else if (type == 1)
-                this.emit("stdout", data);
-            else if (type == 2)
-                this.emit("stderr", data);
-            else
-                this.emit("unknown", data);
-
-            this.buffer = this.buffer.subarray(8 + length);
-            if (!this.buffer.length) this.buffer = Buffer.alloc(0);
-        };
-    }
-
-    override _read(size: number): void {
-
-    }
-
-    public override _write(chunk: Buffer, encoding: BufferEncoding, callback: (err?: Error | null) => void) {
-        if (!this.socket.writable) return callback(new Error("Socket closed"));
-        return this.socket.write(chunk, encoding, callback);
-    }
-
-    public override _final(callback: () => void) {
-        if (this.socket.writable) this.socket.end();
-        return callback();
-    }
-
-    public override _destroy(error: Error | null, callback: (error?: Error | null) => void): void {
-        console.error(error);
-        console.log("killed");
-        try {
-            if (!this.socket.closed)
-                this.socket.end(callback);
-        } catch (err: any) {
-            callback(err);
-        }
-    }
-}
-/* eslint-enable @typescript-eslint/naming-convention */

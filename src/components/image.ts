@@ -1,10 +1,18 @@
-import { AxiosError, type AxiosInstance } from "axios";
-import type { BuildOption, DeleteBuildCacheResponse, DeleteBuildCacheFilter as DeleteCacheFilters, DeleteResponse, InspectImage, Layer, ListFilter, ListImage, SearchFilter, SearchResponse } from "../typing/image";
-import { APIError, BadParameter, Conflict, ImageNotFound, InvalidRepo, MissingTarPath } from "../lib/error";
+import axios, { type AxiosInstance } from "axios";
+import type { BuildOption, CreateFromContainerBody, CreateFromContainerOption, CreateFromContainerResponse, DeleteBuildCacheResponse, DeleteBuildCacheFilter as DeleteCacheFilters, DeleteImageResponse, InspectImage, ImageLayer, ListFilter, ImageSummary, PruneImageFilter, PruneImageResponse, ImageSearchFilter, ImageSearchResponse, CreateFromContainerParam, RegistryImage } from "../typing/image";
+import { APIError, AuthFailOrCanFindImage, BadParameter, Conflict, ContainerNotFound, ImageNotFound, InvalidRepo, MissingTarPath } from "../lib/error";
 import fs from 'node:fs';
+import type { StringObject } from "../typing/global";
+import { objectToQuery } from "../lib/utils";
+import type { AuthConfig } from "../typing/client";
 
 export class Image {
-    constructor(private api: AxiosInstance) { }
+    private readonly AuthConfigString?: string;
+
+    constructor(private api: AxiosInstance, private authConfig?: AuthConfig) {
+        if (authConfig)
+            this.AuthConfigString = JSON.stringify(authConfig);
+    }
 
     /**
      * Returns a list of images on the server. Note that it uses a different, smaller representation of an image than inspecting a single image.
@@ -21,25 +29,15 @@ export class Image {
         digests?: boolean,
         /** Include `Manifests` in the image summary. */
         manifests?: boolean,
-    }): Promise<ListImage[]> {
-        options ||= {};
-        options.all ||= false;
-        options["shared-size"] ||= false;
-        options.digests ||= false;
-        options.manifests ||= false;
+    }): Promise<ImageSummary[]> {
 
         try {
-            const response = await this.api.get<ListImage[]>(
-                `/v1.51/images/json?` +
-                (options.all ? `all=${options.all}&` : '') +
-                (options["shared-size"] ? `shared-size=${options["shared-size"]}&` : '') +
-                (options.digests ? `digests=${options.digests}&` : '') +
-                (options.manifests ? `manifests=${options.manifests}&` : '') +
-                (options.filters ? `filters=${JSON.stringify(options.filters)}` : '')
+            const response = await this.api.get<ImageSummary[]>(
+                `/images/json?` + objectToQuery(options || {}, {}, ["filters"])
             );
             return response.data;
         } catch (err) {
-            if (err instanceof AxiosError) {
+            if (axios.isAxiosError(err)) {
                 const message = err.response?.data.message || err.message;
                 if (err.status == 500)
                     throw new APIError(message);
@@ -56,45 +54,46 @@ export class Image {
      * The Docker daemon performs a preliminary validation of the Dockerfile before starting the build, and returns an error if the syntax is incorrect. After that, each instruction is run one-by-one until the ID of the new image is output.
      * 
      * The build is canceled if the client drops the connection by quitting or being killed.
+     * 
+     * @param extendAuthConfig Auth configurations for multiple registries that a build may refer to.
+     * 
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImageBuild
      */
-    public async build(options: BuildOption) {
+    public async build(
+        options: BuildOption,
+        /** Only the registry domain name (and port if not the default 443) are required. However, for legacy reasons, the Docker Hub registry must be specified with both a https:// prefix and a /v1/ suffix even though Docker will prefer to use the v2 registry API. */
+        extendAuthConfig?: {
+            [serveraddress: string]: {
+                username: string,
+                password: string
+            }
+        }
+    ) {
+        const headers: Record<string, string> = {
+            "Content-Type": "application/x-tar"
+        };
+        if (this.authConfig || extendAuthConfig) {
+            const config = extendAuthConfig || {};
+            if (this.authConfig)
+                config[this.authConfig.serveraddress] = {
+                    username: this.authConfig.username,
+                    password: this.authConfig.password,
+                };
+            headers["X-Registry-Config"] = Buffer.from(JSON.stringify(config)).toBase64();
+        }
+
         try {
             const requestUrl =
-                `/v1.51/images/json?` +
-                (options.dockerfile ? `dockerfile=${options.dockerfile}&` : '') +
-                (options.t ? `t=${options.t}&` : '') +
-                (options.extrahosts ? `extrahosts=${options.extrahosts}&` : '') +
-                (options.remote ? `remote=${options.remote}&` : '') +
-                (options.q ? `q=${options.q}&` : '') +
-                (options.nocache ? `nocache=${options.nocache}&` : '') +
-                (options.cachefrom ? `cachefrom=${options.cachefrom}&` : '') +
-                (options.pull ? `pull=${options.pull}&` : '') +
-                (options.rm ? `rm=${options.rm}&` : '') +
-                (options.forcerm ? `forcerm=${options.forcerm}&` : '') +
-                (options.memory ? `memory=${options.memory}&` : '') +
-                (options.memswap ? `memswap=${options.memswap}&` : '') +
-                (options.cpushares ? `cpushares=${options.cpushares}&` : '') +
-                (options.cpusetcpus ? `cpusetcpus=${options.cpusetcpus}&` : '') +
-                (options.cpuquota ? `cpuquota=${options.cpuquota}&` : '') +
-                (options.buildargs ? `buildargs=${JSON.stringify(options.buildargs)}&` : '') +
-                (options.shmsize ? `shmsize=${options.shmsize}&` : '') +
-                (options.squash ? `squash=${options.squash}&` : '') +
-                (options.labels ? `labels=${JSON.stringify(options.labels)}&` : '') +
-                (options.platform ? `platform=${options.platform}&` : '') +
-                (options.target ? `target=${options.target}&` : '') +
-                (options.outputs ? `outputs=${options.outputs}&` : '') +
-                (options.version ? `version=${options.version}` : '');
+                `/images/json?` + objectToQuery(options, {}, ["buildargs", "labels"]);
             if (!options.remote) {
                 if (!options.tarPath)
                     throw new MissingTarPath();
                 const file = fs.createReadStream(options.tarPath);
-                await this.api.post<ListImage[]>(
+                await this.api.post<ImageSummary[]>(
                     requestUrl,
                     file,
                     {
-                        headers: {
-                            "Content-Type": "application/x-tar"
-                        },
+                        headers,
                         timeout: 0
                     }
                 );
@@ -106,16 +105,14 @@ export class Image {
                     requestUrl,
                     file || {},
                     {
-                        headers: {
-                            "Content-Type": "application/x-tar"
-                        },
+                        headers,
                         timeout: 0
 
                     }
                 );
             }
         } catch (err) {
-            if (err instanceof AxiosError) {
+            if (axios.isAxiosError(err)) {
                 const message = err.response?.data.message || err.message;
                 if (err.status == 400)
                     throw new BadParameter(message);
@@ -126,34 +123,33 @@ export class Image {
         }
     }
 
+    /**
+     * Delete builder cache
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/BuildPrune
+     */
     public async deleteBuildCache(options?: {
         /**
          *  Amount of disk space in bytes to keep for cache
          * @deprecated This parameter is deprecated and has been renamed to `reserved-space`. It is kept for backward compatibility and will be removed in API v1.49.
          */
-        "keep-storage": undefined,
+        "keep-storage"?: undefined,
         /** Amount of disk space in bytes to keep for cache */
-        "reserved-space": number,
+        "reserved-space"?: number,
         /** Maximum amount of disk space allowed to keep for cache */
-        "max-used-space": number,
+        "max-used-space"?: number,
         /** Target amount of free disk space after pruning */
-        "min-free-space": number,
+        "min-free-space"?: number,
         /** Remove all types of build cache */
-        all: boolean,
-        filters: DeleteCacheFilters
+        all?: boolean,
+        filters?: DeleteCacheFilters
     }): Promise<DeleteBuildCacheResponse> {
         try {
             const response = await this.api.post<DeleteBuildCacheResponse>(
-                "/v1.51/build/prune?" +
-                (options?.["reserved-space"] ? `reserved-space=${options["reserved-space"]}&` : '') +
-                (options?.["max-used-space"] ? `max-used-space=${options["max-used-space"]}&` : '') +
-                (options?.["min-free-space"] ? `min-free-space=${options["min-free-space"]}&` : '') +
-                (options?.all ? `all=${options.all}&` : '') +
-                (options?.filters ? `filters=${JSON.stringify(options.filters)}` : '')
+                "/build/prune?" + objectToQuery(options || {}, {}, ["filters"])
             );
             return response.data;
         } catch (err) {
-            if (err instanceof AxiosError) {
+            if (axios.isAxiosError(err)) {
                 const message = err.response?.data.message || err.message;
                 if (err.status == 500)
                     throw new APIError(message);
@@ -164,6 +160,7 @@ export class Image {
 
     /**
      * Pull or import an image.
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImageCreate
      */
     public async create(
         options?: {
@@ -201,20 +198,14 @@ export class Image {
             content?: string,
         }
     ) {
+        const headers: Record<string, string> = {};
+        if (this.AuthConfigString)
+            headers["X-Registry-Auth"] = Buffer.from(this.AuthConfigString).toBase64({ alphabet: "base64url" });
+
         try {
-            await this.api.post(
-                `/v1.51/images/create?` +
-                (options?.fromImage ? `fromImage=${options.fromImage}&` : '') +
-                (options?.fromSrc ? `fromSrc=${options.fromSrc}&` : '') +
-                (options?.repo ? `repo=${options.repo}&` : '') +
-                (options?.tag ? `tag=${options.tag}&` : '') +
-                (options?.message ? `message=${options.message}&` : '') +
-                (options?.changes ? `changes=${JSON.stringify(options.changes)}&` : '') +
-                (options?.platform ? `platform=${options.platform}&` : '') +
-                (options?.changes ? `changes=${options.changes}` : '')
-            );
+            await this.api.post(`/images/create?` + objectToQuery(options || {}), options?.content || "", { headers });
         } catch (err) {
-            if (err instanceof AxiosError) {
+            if (axios.isAxiosError(err)) {
                 const message = err.response?.data.message || err.message;
                 if (err.status == 404)
                     throw new InvalidRepo(message);
@@ -229,13 +220,14 @@ export class Image {
      * Return low-level information about an image.
      * @param id Image name or id
      * @param manifests Include Manifests in the image summary.
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImageInspect
      */
     public async inspect(id: string, manifests: boolean = false): Promise<InspectImage> {
         try {
-            const response = await this.api.get<InspectImage>(`/v1.51/images/${id}/json?manifests=${manifests}`);
+            const response = await this.api.get<InspectImage>(`/images/${id}/json?manifests=${manifests}`);
             return response.data;
         } catch (err) {
-            if (err instanceof AxiosError) {
+            if (axios.isAxiosError(err)) {
                 const message = err.response?.data.message || err.message;
                 if (err.status == 404)
                     throw new ImageNotFound(id);
@@ -250,6 +242,7 @@ export class Image {
      * Return parent layers of an image.
      * @param id Image name or ID
      * @param platform JSON-encoded OCI platform to select the platform-variant.
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImageHistory
      */
     public async history(
         id: string,
@@ -261,15 +254,14 @@ export class Image {
          * Example: `{"os": "linux", "architecture": "arm", "variant": "v5"}`
          */
         platform?: Record<string, string>
-    ): Promise<Layer[]> {
+    ): Promise<ImageLayer[]> {
         try {
-            const response = await this.api.get<Layer[]>(
-                `/v1.51/images/${id}/history?` +
-                `platform=${JSON.stringify(platform)}`
+            const response = await this.api.get<ImageLayer[]>(
+                `/images/${id}/history?` + objectToQuery({ platform })
             );
             return response.data;
         } catch (err) {
-            if (err instanceof AxiosError) {
+            if (axios.isAxiosError(err)) {
                 const message = err.response?.data.message || err.message;
                 if (err.status == 404)
                     throw new ImageNotFound(id);
@@ -287,7 +279,8 @@ export class Image {
      * 
      * The push is cancelled if the HTTP connection is closed.
      * 
-     * @param name Name of the image to push. 
+     * @param name Name of the image to push.
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImagePush
      */
     public async push(
         /**
@@ -311,18 +304,21 @@ export class Image {
             platform?: string,
         }
     ) {
+        const headers: Record<string, string> = {};
+        if (this.AuthConfigString)
+            headers["X-Registry-Auth"] = Buffer.from(this.AuthConfigString).toBase64({ alphabet: "base64url" });
+
         try {
             await this.api.post(
-                `/v1.51/images/${name}/push?` +
-                (options?.tag ? `tag=${options.tag}&` : "") +
-                (options?.platform ? `platform=${options.platform}` : ""),
+                `/images/${name}/push?` + objectToQuery(options || {}),
                 {},
                 {
-                    timeout: 0
+                    timeout: 0,
+                    headers
                 }
             );
         } catch (err) {
-            if (err instanceof AxiosError) {
+            if (axios.isAxiosError(err)) {
                 const message = err.response?.data.message || err.message;
                 if (err.status == 404)
                     throw new ImageNotFound(name);
@@ -336,6 +332,7 @@ export class Image {
     /**
      * Tag an image so that it becomes part of a repository
      * @param name Image name or ID to tag.
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImageTag
      */
     public async tag(
         name: string,
@@ -348,12 +345,10 @@ export class Image {
     ) {
         try {
             await this.api.post(
-                `/v1.51/images/${name}/push?` +
-                (options?.tag ? `tag=${options.tag}&` : "") +
-                (options?.repo ? `repo=${options.repo}` : ""),
+                `/images/${name}/push?` + objectToQuery(options || {}),
             );
         } catch (err) {
-            if (err instanceof AxiosError) {
+            if (axios.isAxiosError(err)) {
                 const message = err.response?.data.message || err.message;
                 if (err.status == 400)
                     throw new BadParameter(message);
@@ -374,6 +369,7 @@ export class Image {
      * Images can't be removed if they have descendant images, are being used by a running container or are being used by a build
      * 
      * @param name Image name or ID
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImageDelete
      */
     public async remove(
         name: string,
@@ -385,17 +381,14 @@ export class Image {
             /** Select platform-specific content to delete. Multiple values are accepted. Each platform is a OCI platform encoded as a JSON string. */
             platforms?: string[]
         }
-    ): Promise<DeleteResponse[]> {
+    ): Promise<DeleteImageResponse[]> {
         try {
-            const reponse = await this.api.delete<DeleteResponse[]>(
-                `/v1.51/images/${name}?` +
-                (options?.force ? `force=${options.force}&` : "") +
-                (options?.noprune ? `noprune=${options.noprune}&` : "") +
-                (options?.platforms ? `platforms=${JSON.stringify(options.platforms)}` : "")
+            const reponse = await this.api.delete<DeleteImageResponse[]>(
+                `/images/${name}?` + objectToQuery(options || {}, {}, ['platforms'])
             );
             return reponse.data;
         } catch (err) {
-            if (err instanceof AxiosError) {
+            if (axios.isAxiosError(err)) {
                 const message = err.response?.data.message || err.message;
                 if (err.status == 404)
                     throw new ImageNotFound(name);
@@ -408,26 +401,240 @@ export class Image {
         }
     }
 
+    /**
+     * Search for an image on Docker Hub.
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImageSearch
+     */
     public async search(options: {
         /** Term to search */
         term: string,
         /** Maximum number of results to return */
         limit?: number,
         /** A JSON encoded value of the filters */
-        filters?: SearchFilter
-    }): Promise<SearchResponse[]> {
+        filters?: ImageSearchFilter
+    }): Promise<ImageSearchResponse[]> {
         try {
-            const reponse = await this.api.delete<SearchResponse[]>(
-                `/v1.51/images/search?` +
-                `term=${options.term}&` +
-                (options?.limit ? `limit=${options.limit}&` : "") +
-                (options?.filters ? `filters=${JSON.stringify(options.filters)}` : "")
+            const reponse = await this.api.delete<ImageSearchResponse[]>(
+                `/images/search?` + objectToQuery(options, {}, ['filters'])
             );
             return reponse.data;
         } catch (err) {
-            if (err instanceof AxiosError) {
+            if (axios.isAxiosError(err)) {
                 const message = err.response?.data.message || err.message;
                 if (err.status == 500)
+                    throw new APIError(message);
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * Delete unused images
+     * @param filters Filters to process on the prune list
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImagePrune
+     */
+    public async prune(filters?: PruneImageFilter): Promise<PruneImageResponse> {
+        try {
+            const response = await this.api.post<PruneImageResponse>(
+                `/images/prune?` + objectToQuery({ filters }, {}, ['filters'])
+            );
+            return response.data;
+        } catch (err) {
+            if (axios.isAxiosError(err)) {
+                const message = err.response?.data.message || err.message;
+                if (err.status == 500)
+                    throw new APIError(message);
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * Create a new image from a container
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImageCommit
+     */
+    public async createFromContainer(options: CreateFromContainerOption): Promise<CreateFromContainerResponse> {
+        const queryParam: CreateFromContainerParam = {
+            container: options.container,
+            repo: options.repo,
+            tag: options.tag,
+            author: options.author,
+            changes: options.changes,
+            comment: options.comment,
+            pause: options.pause
+        };
+        const body: CreateFromContainerBody = {
+            Hostname: options.Hostname,
+            Domainname: options.Domainname,
+            User: options.User,
+            AttachStdin: options.AttachStdin,
+            AttachStdout: options.AttachStdout,
+            AttachStderr: options.AttachStderr,
+            ExposedPorts: options.ExposedPorts,
+            Tty: options.Tty,
+            OpenStdin: options.OpenStdin,
+            StdinOnce: options.StdinOnce,
+            Env: options.Env,
+            Cmd: options.Cmd,
+            Healthcheck: options.Healthcheck,
+            ArgsEscaped: options.ArgsEscaped,
+            Image: options.Image,
+            Volumes: options.Volumes,
+            WorkingDir: options.WorkingDir,
+            Entrypoint: options.Entrypoint,
+            NetworkDisabled: options.NetworkDisabled,
+            MacAddress: undefined,
+            OnBuild: options.OnBuild,
+            Labels: options.Labels,
+            StopSignal: options.StopSignal,
+            StopTimeout: options.StopTimeout,
+            Shell: options.Shell,
+        };
+        try {
+            const response = await this.api.post<CreateFromContainerResponse>(
+                `/commit?` + objectToQuery(queryParam),
+                body
+            );
+            return response.data;
+        } catch (err) {
+            if (axios.isAxiosError(err)) {
+                const message = err.response?.data.message || err.message;
+                if (err.status == 404)
+                    throw new ContainerNotFound(options.container || "");
+                if (err.status == 500)
+                    throw new APIError(message);
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * Get a tarball containing all images and metadata for a repository.
+     * 
+     * If `name` is a specific name and tag (e.g. `ubuntu:latest`), then only that image (and its parents) are returned. If `name` is an image ID, similarly only that image (and its parents) are returned, but with the exclusion of the `repositories` file in the tarball, as there were no image names referenced.
+     * 
+     * ## Image tarball format
+     * 
+     * An image tarball contains Content as defined in the OCI Image Layout Specification.
+     * 
+     * Additionally, includes the manifest.json file associated with a backwards compatible docker save format.
+     * 
+     * If the tarball defines a repository, the tarball should also include a `repositories` file at the root that contains a list of repository and tag names mapped to layer IDs.
+     * 
+     * ```json
+     * {
+     *   "hello-world": {
+     *     "latest": "565a9d68a73f6706862bfe8409a7f659776d4d60a8d096eb4a3cbce6999cc2a1"
+     *   }
+     * }
+     * ```
+     * @param id Image name or ID
+     * @see https://github.com/opencontainers/image-spec/blob/v1.1.1/image-layout.md#content
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImageGet
+     */
+    public async export(id: string, option: {
+        /** Path to save tar file to */
+        path: string,
+        /** 
+         * JSON encoded OCI platform describing a platform which will be used to select a platform-specific image to be saved if the image is multi-platform. If not provided, the full multi-platform image will be saved. 
+         *
+         * Example: `{"os": "linux", "architecture": "arm", "variant": "v5"}`
+         */
+        platform: StringObject,
+    }) {
+        try {
+            const response = await this.api.get(
+                `/images/${id}/get?` + objectToQuery(option, {}, ['platform']),
+                {
+                    responseType: 'stream'
+                }
+            );
+            const writeStream = fs.createWriteStream(option.path);
+            response.data.pipe(writeStream);
+            return new Promise<void>((resolve, reject) => {
+                writeStream.once('close', resolve);
+                writeStream.once('error', (error) => {
+                    writeStream.close();
+                    reject(error);
+                });
+            });
+        } catch (err) {
+            if (axios.isAxiosError(err)) {
+                const message = err.response?.data.message || err.message;
+                if (err.status == 500)
+                    throw new APIError(message);
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * Load a set of images and tags into a repository.
+     *
+     * ## Image tarball format
+     * 
+     * An image tarball contains Content as defined in the OCI Image Layout Specification.
+     * 
+     * Additionally, includes the manifest.json file associated with a backwards compatible docker save format.
+     * 
+     * If the tarball defines a repository, the tarball should also include a `repositories` file at the root that contains a list of repository and tag names mapped to layer IDs.
+     * 
+     * ```json
+     * {
+     *   "hello-world": {
+     *     "latest": "565a9d68a73f6706862bfe8409a7f659776d4d60a8d096eb4a3cbce6999cc2a1"
+     *   }
+     * }
+     * ```
+     * 
+     * @param path Path to tar file
+     * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImageLoad
+     */
+    public async upload(path: string, options?: {
+        /** Suppress progress details during load. */
+        quiet?: boolean,
+        /** 
+         * JSON encoded OCI platform describing a platform which will be used to select a platform-specific image to be saved if the image is multi-platform. If not provided, the full multi-platform image will be saved. 
+         *
+         * Example: `{"os": "linux", "architecture": "arm", "variant": "v5"}`
+         */
+        platform?: StringObject
+    }) {
+        try {
+            const readStream = fs.createReadStream(path);
+            await this.api.post(
+                `/images/load?` + objectToQuery(options || {}),
+                readStream,
+                {
+                    headers: {
+                        "Content-Type": "application/x-tar"
+                    }
+                }
+            );
+        } catch (err) {
+            if (axios.isAxiosError(err)) {
+                const message = err.response?.data.message || err.message;
+                if (err.status == 500)
+                    throw new APIError(message);
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * Return image digest and platform information by contacting the registry
+     * @param name Image name or id
+     */
+    public async searchOnRegistry(name: string): Promise<RegistryImage> {
+        try {
+            const response = await this.api.get<RegistryImage>(`/distribution/${name}/json`);
+            return response.data;
+        } catch (err) {
+            if (axios.isAxiosError(err)) {
+                const message = err.response?.data.message || err.message;
+                if (err.status == 401)
+                    throw new AuthFailOrCanFindImage(message);
+                else if (err.status == 500)
                     throw new APIError(message);
             }
             throw err;

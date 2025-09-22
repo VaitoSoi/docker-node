@@ -1,4 +1,4 @@
-import type { Env, ExposedPorts, GraphDriver, HealthCheck, StringObject } from "./main";
+import type { Env, ExposedPorts, GraphDriver, HealthCheck, Platform, StringObject } from "./global";
 
 export interface DescriptorPlaform {
     /** The CPU architecture. */
@@ -52,7 +52,14 @@ export interface ImageManifest {
         /** Content is the size (in bytes) of all the locally present content in the content store (e.g. image config, layers) referenced by this manifest and its children. This only includes blobs in the content store. */
         Content: number
     },
-    /** The kind of the manifest. */
+    /** 
+     * The kind of the manifest. 
+     * 
+     * | kind        | description                                                                          |
+     * |-------------|--------------------------------------------------------------------------------------|
+     * | image       | Image manifest that can be used to start a container.                                |
+     * | attestation | Attestation manifest produced by the Buildkit builder for a specific image manifest. |
+     */
     Kind: "image" | "attestation" | "unknown",
     /** The image data for the image manifest. This field is only populated when Kind is "image". */
     ImageData: {
@@ -86,7 +93,7 @@ export interface ListFilter {
     until?: string,
 }
 
-export interface ListImage {
+export interface ImageSummary {
     /** 
      * ID is the content-addressable ID of an image.
      * 
@@ -364,7 +371,7 @@ export interface InspectImage {
 }
 
 /* History */
-export interface Layer {
+export interface ImageLayer {
     Id: string,
     Created: number,
     CreatedBy: string,
@@ -374,7 +381,7 @@ export interface Layer {
 }
 
 /* Delete */
-export interface DeleteResponse {
+export interface DeleteImageResponse {
     /** The image ID of an image that was untagged */
     Untagged: string,
     /** The image ID of an image that was deleted */
@@ -382,7 +389,12 @@ export interface DeleteResponse {
 }
 
 /* Search */
-export interface SearchResponse {
+export interface ImageSearchFilter {
+    "is-official": boolean,
+    stars: number
+}
+
+export interface ImageSearchResponse {
     description: string,
     is_official: string,
     /**
@@ -394,20 +406,8 @@ export interface SearchResponse {
     star_count: number,
 }
 
-export interface SearchFilter {
-    "is-official": boolean,
-    stars: number
-}
-
 /* Prune */
-export interface PruneResponse {
-    /** Images that were deleted */
-    ImagesDeleted: DeleteResponse[],
-    /** Disk space reclaimed in bytes */
-    SpaceReclaimed: number
-}
-
-export interface PruneFilter {
+export interface PruneImageFilter {
     /** Prune only unused and untagged images */
     dangling: boolean,
     /** Prune images created before this timestamp */
@@ -416,74 +416,108 @@ export interface PruneFilter {
     label: string,
 }
 
+export interface PruneImageResponse {
+    /** Images that were deleted */
+    ImagesDeleted: DeleteImageResponse[],
+    /** Disk space reclaimed in bytes */
+    SpaceReclaimed: number
+}
+
 /* Create image from container */
-export interface CreateFromContainerOption {
+export interface CreateFromContainerParam {
+    /** The ID or name of the container to commit */
+    container: string,
+    /** Repository name for the created image */
+    repo: string,
+    /** Tag name for the create image */
+    tag: string,
+    /** Commit message */
+    comment?: string,
+    /** Author of the image */
+    author?: string,
+    /** Whether to pause the container before committing */
+    pause?: boolean,
+    /** `Dockerfile` instructions to apply while committing */
+    changes?: string
+}
+
+export interface CreateFromContainerBody {
     /** The hostname to use for the container, as a valid RFC 1123 hostname. */
-    Hostname: string,
+    Hostname?: string,
     /** The domain name to use for the container. */
-    Domainname: string,
+    Domainname?: string,
     /** 
      * Commands run as this user inside the container. If omitted, commands run as the user specified in the image the container was started from.
      * 
      * Can be either user-name or UID, and optional group-name or GID, separated by a colon (`<user-name|UID>[<:group-name|GID>]`).
      */
-    User: string,
+    User?: string,
     /** Whether to attach to `stdin`. */
-    AttachStdin: boolean,
+    AttachStdin?: boolean,
     /** Whether to attach to `stdout`. */
-    AttachStdout: boolean,
+    AttachStdout?: boolean,
     /** Whether to attach to `stderr`. */
-    AttachStderr: boolean,
+    AttachStderr?: boolean,
     /** An object mapping ports to an empty object */
-    ExposedPorts: ExposedPorts,
+    ExposedPorts?: ExposedPorts,
     /** Attach standard streams to a TTY, including `stdin` if it is not closed. */
-    Tty: boolean,
+    Tty?: boolean,
     /** Open `stdin` */
-    OpenStdin: boolean,
+    OpenStdin?: boolean,
     /** Close `stdin` after one attached client disconnects */
-    StdinOnce: boolean,
+    StdinOnce?: boolean,
     /** A list of environment variables to set inside the container */
-    Env: Env[],
+    Env?: Env[],
     /** Command to run specified as a string or an array of strings. */
-    Cmd: string[],
+    Cmd?: string[],
     /** A test to perform to check that the container is healthy. */
-    Healthcheck: HealthCheck,
+    Healthcheck?: HealthCheck,
     /** Command is already escaped (Windows only) */
-    ArgsEscaped: boolean | null,
+    ArgsEscaped?: boolean,
     /** The name (or reference) of the image to use when creating the container, or which was used when the container was created. */
-    Image: string,
+    Image?: string,
     /** An object mapping mount point paths inside the container to empty objects. */
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-    Volumes: Record<string, {}>,
+    Volumes?: Record<string, {}>,
     /**The working directory for commands to run in.  */
-    WorkingDir: string,
+    WorkingDir?: string,
     /** 
      * The entry point for the container as a string or an array of strings.
      * 
      * If the array consists of exactly one empty string (`[""]`) then the entry point is reset to system default (i.e., the entry point used by docker when there is no `ENTRYPOINT` instruction in the `Dockerfile`).
      */
-    Entrypoint: string[],
+    Entrypoint?: string[],
     /** Disable networking for the container. */
-    NetworkDisabled: boolean | null,
+    NetworkDisabled?: boolean,
     /** 
      * MAC address of the container.
      * 
      * @deprecated this field is deprecated in API v1.44 and up. Use EndpointSettings.MacAddress instead.
      */
-    MacAddress: string | null,
+    MacAddress?: undefined,
     /** `ONBUILD` metadata that were defined in the image's `Dockerfile`. */
-    OnBuild: string[] | null,
+    OnBuild?: string[],
     /** User-defined key/value metadata. */
-    Labels: StringObject,
+    Labels?: StringObject,
     /** Signal to stop a container as a string or unsigned integer. */
-    StopSignal: string | null,
+    StopSignal?: string,
     /** Timeout to stop a container in seconds. */
-    StopTimeout: number | null,
+    StopTimeout?: number,
     /** Shell for when `RUN`, `CMD`, and `ENTRYPOINT` uses a shell. */
-    Shell: string[] | null
+    Shell?: string[]
 }
+
+export interface CreateFromContainerOption extends CreateFromContainerParam, CreateFromContainerBody { }
 
 export interface CreateFromContainerResponse {
     /** The id of the newly created object. */
     Id: string
+}
+
+/*
+ * Get image from registry
+ */
+export interface RegistryImage {
+    Descriptor: ImageManifestDescriptor,
+    Platforms: DescriptorPlaform[] | null
 }
