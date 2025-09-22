@@ -1,5 +1,5 @@
 import type { AxiosInstance } from "axios";
-import type { ListNodeFilter, NodeObject, UpdateNodeBody, UpdateNodeOption, UpdateNodeParam } from "../typing/node";
+import type { ListNodeFilter, NodeObject, UpdateNodeBody, UpdateNodeOption, UpdateNodeParam } from "../../typing/node";
 import { objectToQuery } from "../lib/utils";
 import axios from "axios";
 import { APIError, BadParameter, NodeNotFound, NotInSwarm } from "../lib/error";

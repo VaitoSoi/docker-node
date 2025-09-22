@@ -1,5 +1,5 @@
 import type { AxiosInstance } from "axios";
-import type { CreateConfigResponse, ListConfigFilter, ConfigObject, ConfigSpec, UpdateConfigBody, UpdateConfigOption, UpdateConfigParam } from "../typing/config";
+import type { CreateConfigResponse, ListConfigFilter, ConfigObject, ConfigSpec, UpdateConfigBody, UpdateConfigOption, UpdateConfigParam } from "../../typing/config";
 import axios from "axios";
 import { APIError, BadParameter, ConfigNotFound, NameIsUsed, NotInSwarm, SecretNotFound } from "../lib/error";
 import { objectToQuery } from "../lib/utils";

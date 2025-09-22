@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance } from "axios";
-import type { CreateNetworkOption, CreateNetworkResponse, LinkContainerOption, ListFilter, NetworkObject, PruneFilter, PruneResponse } from "../typing/network";
+import type { CreateNetworkOption, CreateNetworkResponse, LinkContainerOption, ListFilter, NetworkObject, PruneFilter, PruneResponse } from "../../typing/network";
 import { APIError, BadParameter, Forbidden, NetworkNotFound, NetworkOrContainerNotFound, PluginNotFound } from "../lib/error";
 import { objectToQuery } from "../lib/utils";
 

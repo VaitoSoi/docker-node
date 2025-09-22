@@ -1,5 +1,5 @@
 import type { AxiosInstance } from "axios";
-import type { VolumeObject, ListVolumeFilter, CreateVolumeOption, UpdateVolumeOption, UpdateVolumeParam, UpdateVolumeBody, PruneVolumeFilter, PruneVolumeResponse } from "../typing/volume";
+import type { VolumeObject, ListVolumeFilter, CreateVolumeOption, UpdateVolumeOption, UpdateVolumeParam, UpdateVolumeBody, PruneVolumeFilter, PruneVolumeResponse } from "../../typing/volume";
 import axios from "axios";
 import { APIError, BadParameter, NotInSwarm, VolumeIsInUse, VolumeNotFound } from "../lib/error";
 import { objectToQuery } from "../lib/utils";

@@ -1,10 +1,10 @@
 import axios, { type AxiosInstance } from "axios";
-import type { InspectExec, CreateExecOptions as CreateExecOptions, CreateExecResponse, ResizeExecOptions, StartExecOptions } from "../typing/exec";
+import type { InspectExec, CreateExecOptions as CreateExecOptions, CreateExecResponse, ResizeExecOptions, StartExecOptions } from "../../typing/exec";
 import { APIError, BadParameter, ContainerIsPaused, ContainerNotFound, ExecInstanceNotFound } from "../lib/error";
 import { Duplex } from "node:stream";
 import http from "node:http";
 import { Socket } from "node:net";
-import type { If } from "../typing/global";
+import type { If } from "../../typing/global";
 import { DockerStream } from "../lib/stream";
 
 export class Exec {

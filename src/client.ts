@@ -1,5 +1,5 @@
 import type { AxiosInstance } from "axios";
-import type { DockerClientOption } from "./typing/client";
+import type { DockerClientOption } from "../typing/client";
 import { InvalidURL, MissingURL, NotSupportedVerssion } from "./lib/error";
 import { Container } from "./components/container";
 import { Image } from "./components/image";

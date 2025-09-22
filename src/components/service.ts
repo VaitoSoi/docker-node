@@ -1,12 +1,12 @@
 import type { AxiosInstance } from "axios";
-import type { CreateServiceOption, CreateServiceResponse, ListServiceFilter, ServiceObject, UpdateServiceOption, UpdateServiceParam } from "../typing/service";
+import type { CreateServiceOption, CreateServiceResponse, ListServiceFilter, ServiceObject, UpdateServiceOption, UpdateServiceParam } from "../../typing/service";
 import axios from "axios";
 import { APIError, BadParameter, CanNotUseNetwork, NameIsUsed, NotInSwarm, ServiceNotFound } from "../lib/error";
 import { objectToQuery } from "../lib/utils";
 import { ReadOnlyDockerStream } from "../lib/stream";
 import http from 'node:http';
-import type { SwarmShareLogOption } from "../typing/global";
-import type { AuthConfig } from "../typing/client";
+import type { SwarmShareLogOption } from "../../typing/global";
+import type { AuthConfig } from "../../typing/client";
 
 export class Service {
     private readonly AuthConfigString?: string;

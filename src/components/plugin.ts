@@ -1,10 +1,10 @@
 import type { AxiosInstance } from "axios";
-import type { InstallPluginOption, InstallPluginParam, ListPluginFilter, PluginObject, PluginPrivilege } from "../typing/plugin";
+import type { InstallPluginOption, InstallPluginParam, ListPluginFilter, PluginObject, PluginPrivilege } from "../../typing/plugin";
 import { objectToQuery } from "../lib/utils";
 import axios from "axios";
 import { APIError, PluginNotFound } from "../lib/error";
 import fs from "node:fs";
-import type { AuthConfig } from "../typing/client";
+import type { AuthConfig } from "../../typing/client";
 
 export class Plugin {
     private readonly AuthConfigString?: string;

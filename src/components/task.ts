@@ -1,9 +1,9 @@
 import type { AxiosInstance } from "axios";
-import type { ListTaskFilter, TaskObject } from "../typing/task";
+import type { ListTaskFilter, TaskObject } from "../../typing/task";
 import axios from "axios";
 import { APIError, NotInSwarm, TaskNotFound } from "../lib/error";
 import { objectToQuery } from "../lib/utils";
-import type { SwarmShareLogOption } from "../typing/global";
+import type { SwarmShareLogOption } from "../../typing/global";
 import { ReadOnlyDockerStream } from "../lib/stream";
 import http from "node:http";
 

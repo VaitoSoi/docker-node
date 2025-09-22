@@ -1,5 +1,5 @@
 import type { AxiosInstance } from "axios";
-import type { AuthOption, AuthResponse, UsageObjectType, SystemInfo, SystemVersion, UsageResponse, MonitorOption } from "../typing/system";
+import type { AuthOption, AuthResponse, UsageObjectType, SystemInfo, SystemVersion, UsageResponse, MonitorOption } from "../../typing/system";
 import axios from "axios";
 import { APIError, AuthError, BadParameter } from "../lib/error";
 import { objectToQuery } from "../lib/utils";
@@ -85,9 +85,9 @@ export class System {
         }
     }
 
-    public async usage(type: [UsageObjectType, ...rest: UsageObjectType[]]): Promise<UsageResponse> {
+    public async usage(): Promise<UsageResponse> {
         try {
-            const response = await this.api.get<UsageResponse>("/system/df?" + objectToQuery({ type }, {}, ['type']));
+            const response = await this.api.get<UsageResponse>("/system/df?");
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error)) {

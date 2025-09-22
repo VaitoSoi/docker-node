@@ -1,5 +1,5 @@
 import axios, { AxiosError, type AxiosInstance } from "axios";
-import type { InitSwarmOption, InitSwarmResponse, InspectSwarm, JoinSwarm, SwarmUnlockKey, UpdateSwarmBody, UpdateSwarmOption, UpdateSwarmParam } from "../typing/swarm";
+import type { InitSwarmOption, InitSwarmResponse, InspectSwarm, JoinSwarm, SwarmUnlockKey, UpdateSwarmBody, UpdateSwarmOption, UpdateSwarmParam } from "../../typing/swarm";
 import { AlreadyInSwarm, APIError, BadParameter, NotInSwarm, SwarmNotFound } from "../lib/error";
 import { objectToQuery } from "../lib/utils";
 

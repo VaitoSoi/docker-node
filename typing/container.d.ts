@@ -161,20 +161,20 @@ export interface ContainerSummary {
 }
 
 export interface ContainerListFilter {
-    ancestor: string,
-    before: string,
-    expose: string,
-    exited: number,
-    health: "starting" | "healthy" | "unhealthy" | "none",
-    id: string,
-    isolation: "default" | "process" | "hyperv" | undefined,
-    "is-task": boolean,
-    label: string[],
-    name: string,
-    network: string,
-    publish: string,
-    since: string,
-    status: ContainerStatus,
+    ancestor?: string,
+    before?: string,
+    expose?: string,
+    exited?: number,
+    health?: "starting" | "healthy" | "unhealthy" | "none",
+    id?: string,
+    isolation?: "default" | "process" | "hyperv" | undefined,
+    "is-task"?: boolean,
+    label?: string[],
+    name?: string,
+    network?: string,
+    publish?: string,
+    since?: string,
+    status?: ContainerStatus,
 }
 
 /*

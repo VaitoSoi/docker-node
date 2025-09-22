@@ -13,7 +13,7 @@ import type {
     PruneContainer,
     ContainerSummary,
     CreateContainerParam
-} from "../typing/container";
+} from "../../typing/container";
 import {
     APIError,
     BadParameter,

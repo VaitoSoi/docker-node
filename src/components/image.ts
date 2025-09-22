@@ -1,10 +1,10 @@
 import axios, { type AxiosInstance } from "axios";
-import type { BuildOption, CreateFromContainerBody, CreateFromContainerOption, CreateFromContainerResponse, DeleteBuildCacheResponse, DeleteBuildCacheFilter as DeleteCacheFilters, DeleteImageResponse, InspectImage, ImageLayer, ListFilter, ImageSummary, PruneImageFilter, PruneImageResponse, ImageSearchFilter, ImageSearchResponse, CreateFromContainerParam, RegistryImage } from "../typing/image";
+import type { BuildOption, CreateFromContainerBody, CreateFromContainerOption, CreateFromContainerResponse, DeleteBuildCacheResponse, DeleteBuildCacheFilter as DeleteCacheFilters, DeleteImageResponse, InspectImage, ImageLayer, ListFilter, ImageSummary, PruneImageFilter, PruneImageResponse, ImageSearchFilter, ImageSearchResponse, CreateFromContainerParam, RegistryImage } from "../../typing/image";
 import { APIError, AuthFailOrCanFindImage, BadParameter, Conflict, ContainerNotFound, ImageNotFound, InvalidRepo, MissingTarPath } from "../lib/error";
 import fs from 'node:fs';
-import type { StringObject } from "../typing/global";
+import type { StringObject } from "../../typing/global";
 import { objectToQuery } from "../lib/utils";
-import type { AuthConfig } from "../typing/client";
+import type { AuthConfig } from "../../typing/client";
 
 export class Image {
     private readonly AuthConfigString?: string;

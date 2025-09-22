@@ -1,5 +1,5 @@
 import type { AxiosInstance } from "axios";
-import type { CreateSecretResponse, ListSecretFilter, SecretObject, SecretSpec, UpdateSecretBody, UpdateSecretOption, UpdateSecretParam } from "../typing/secret";
+import type { CreateSecretResponse, ListSecretFilter, SecretObject, SecretSpec, UpdateSecretBody, UpdateSecretOption, UpdateSecretParam } from "../../typing/secret";
 import axios from "axios";
 import { APIError, BadParameter, NameIsUsed, NotInSwarm, SecretNotFound } from "../lib/error";
 import { objectToQuery } from "../lib/utils";
