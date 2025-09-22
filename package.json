@@ -1,5 +1,6 @@
 {
   "name": "docker-node",
+  "version": "1.0.0",
   "main": "dist/client.js",
   "typings": "dist/client.d.ts",
   "type": "module",
