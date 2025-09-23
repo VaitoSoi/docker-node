@@ -1,9 +1,10 @@
 {
   "name": "@vaitosoi/docker-node",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "dist/client.js",
   "typings": "dist/client.d.ts",
   "type": "module",
+  "license": "MIT",
   "devDependencies": {
     "@types/bun": "latest",
     "tsx": "^4.20.5",
