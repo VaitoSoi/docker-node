@@ -74,15 +74,15 @@ export class Image {
             "Content-Type": "application/tar",
             "Transfer-Encoding": "chunked"
         };
-        // if (this.authConfig || extendAuthConfig) {
-        //     const config = extendAuthConfig || {};
-        //     if (this.authConfig)
-        //         config[this.authConfig.serveraddress] = {
-        //             username: this.authConfig.username,
-        //             password: this.authConfig.password,
-        //         };
-        //     headers["X-Registry-Config"] = Buffer.from(JSON.stringify(config)).toBase64();
-        // }
+        if (this.authConfig || extendAuthConfig) {
+            const config = extendAuthConfig || {};
+            if (this.authConfig)
+                config[this.authConfig.serveraddress] = {
+                    username: this.authConfig.username,
+                    password: this.authConfig.password,
+                };
+            headers["X-Registry-Config"] = Buffer.from(JSON.stringify(config)).toBase64();
+        }
 
         try {
             const requestUrl = `/build?` + objectToQuery(options, {}, ["buildargs", "labels"]);
