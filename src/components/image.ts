@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance } from "axios";
-import type { BuildOption, CreateFromContainerBody, CreateFromContainerOption, CreateFromContainerResponse, DeleteBuildCacheResponse, DeleteBuildCacheFilter as DeleteCacheFilters, DeleteImageResponse, InspectImage, ImageLayer, ListFilter, ImageSummary, PruneImageFilter, PruneImageResponse, ImageSearchFilter, ImageSearchResponse, CreateFromContainerParam, RegistryImage, BuildStreamObject } from "../../typing/image";
+import type { BuildOption, CreateFromContainerBody, CreateFromContainerOption, CreateFromContainerResponse, DeleteBuildCacheResponse, DeleteBuildCacheFilter as DeleteCacheFilters, DeleteImageResponse, InspectImage, ImageLayer, ListFilter, ImageSummary, PruneImageFilter, PruneImageResponse, ImageSearchFilter, ImageSearchResponse, CreateFromContainerParam, RegistryImage, BuildStreamObject, PullStreamObject } from "../../typing/image";
 import { APIError, AuthFailOrCanFindImage, BadParameter, Conflict, ContainerNotFound, ImageNotFound, InvalidRepo, MissingTarPath } from "../lib/error";
 import fs from 'node:fs';
 import type { StringObject } from "../../typing/global";
@@ -31,7 +31,6 @@ export class Image {
         /** Include `Manifests` in the image summary. */
         manifests?: boolean,
     }): Promise<ImageSummary[]> {
-
         try {
             const response = await this.api.get<ImageSummary[]>(
                 `/images/json?` + objectToQuery(options || {}, {}, ["filters"])
@@ -187,7 +186,7 @@ export class Image {
      * Pull or import an image.
      * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImageCreate
      */
-    public async create(
+    public async *create(
         options?: {
             /** 
              * Name of the image to pull. If the name includes a tag or digest, specific behavior applies:
@@ -222,13 +221,17 @@ export class Image {
             /** Image content if the value `-` has been specified in fromSrc query parameter */
             content?: string,
         }
-    ) {
+    ): AsyncGenerator<PullStreamObject> {
         const headers: Record<string, string> = {};
         if (this.AuthConfigString)
             headers["X-Registry-Auth"] = Buffer.from(this.AuthConfigString).toBase64({ alphabet: "base64url" });
 
         try {
-            await this.api.post(`/images/create?` + objectToQuery(options || {}), options?.content || "", { headers });
+            const response = await this.api.post<ReadableStream<Buffer>>(`/images/create?` + objectToQuery(options || {}), options?.content || "", { headers, responseType: 'stream' });
+            for await (const data of response.data) {
+                const line = data.toString();
+                yield JSON.parse(line);
+            }
         } catch (err) {
             if (axios.isAxiosError(err)) {
                 const message = err.response?.data.message || err.message;

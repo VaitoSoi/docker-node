@@ -251,6 +251,17 @@ export interface DeleteBuildCacheResponse {
     SpaceReclaimed: number
 }
 
+/** Pull image */
+export type PullStreamObject = {
+    status: string,
+    id?: string,
+    progressDetail: {
+        current: number,
+        total: number
+    },
+    progress: string
+}
+
 /* Inspect image */
 export interface InspectImage {
     /** 
