@@ -225,6 +225,14 @@ export interface BuildOption {
     contextPath?: string,
 }
 
+export type BuildStreamObject = {
+    stream: string
+} | {
+    aux: {
+        ID: string
+    }
+}
+
 /* Delete builder cache */
 export interface DeleteBuildCacheFilter {
     /** remove cache older than `<timestamp>`. The `<timestamp>` can be Unix timestamps, date formatted timestamps, or Go duration strings (e.g. 10m, 1h30m) computed relative to the daemon's local time. */

@@ -1,5 +1,5 @@
 import axios, { type AxiosInstance } from "axios";
-import type { BuildOption, CreateFromContainerBody, CreateFromContainerOption, CreateFromContainerResponse, DeleteBuildCacheResponse, DeleteBuildCacheFilter as DeleteCacheFilters, DeleteImageResponse, InspectImage, ImageLayer, ListFilter, ImageSummary, PruneImageFilter, PruneImageResponse, ImageSearchFilter, ImageSearchResponse, CreateFromContainerParam, RegistryImage } from "../../typing/image";
+import type { BuildOption, CreateFromContainerBody, CreateFromContainerOption, CreateFromContainerResponse, DeleteBuildCacheResponse, DeleteBuildCacheFilter as DeleteCacheFilters, DeleteImageResponse, InspectImage, ImageLayer, ListFilter, ImageSummary, PruneImageFilter, PruneImageResponse, ImageSearchFilter, ImageSearchResponse, CreateFromContainerParam, RegistryImage, BuildStreamObject } from "../../typing/image";
 import { APIError, AuthFailOrCanFindImage, BadParameter, Conflict, ContainerNotFound, ImageNotFound, InvalidRepo, MissingTarPath } from "../lib/error";
 import fs from 'node:fs';
 import type { StringObject } from "../../typing/global";
@@ -69,7 +69,7 @@ export class Image {
                 password: string
             }
         }
-    ): AsyncGenerator<{ stream: string }> {
+    ): AsyncGenerator<BuildStreamObject> {
         const headers: Record<string, string> = {
             "Content-Type": "application/tar",
             "Transfer-Encoding": "chunked"
