@@ -83,8 +83,7 @@ export class Image {
         }
 
         try {
-            const requestUrl =
-                `/images/json?` + objectToQuery(options, {}, ["buildargs", "labels"]);
+            const requestUrl = `/build?` + objectToQuery(options, {}, ["buildargs", "labels"]);
             if (!options.remote) {
                 if (!options.tarPath)
                     throw new MissingTarPath();
