@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import type { StringObject } from "../../typing/global";
 import { objectToQuery } from "../lib/utils";
 import type { AuthConfig } from "../../typing/client";
+import archiver from "archiver";
 
 export class Image {
     private readonly AuthConfigString?: string;
@@ -59,7 +60,7 @@ export class Image {
      * 
      * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Image/operation/ImageBuild
      */
-    public async build(
+    public async *build(
         options: BuildOption,
         /** Only the registry domain name (and port if not the default 443) are required. However, for legacy reasons, the Docker Hub registry must be specified with both a https:// prefix and a /v1/ suffix even though Docker will prefer to use the v2 registry API. */
         extendAuthConfig?: {
@@ -68,39 +69,43 @@ export class Image {
                 password: string
             }
         }
-    ) {
+    ): AsyncGenerator<{ stream: string }> {
         const headers: Record<string, string> = {
-            "Content-Type": "application/x-tar"
+            "Content-Type": "application/tar",
+            "Transfer-Encoding": "chunked"
         };
-        if (this.authConfig || extendAuthConfig) {
-            const config = extendAuthConfig || {};
-            if (this.authConfig)
-                config[this.authConfig.serveraddress] = {
-                    username: this.authConfig.username,
-                    password: this.authConfig.password,
-                };
-            headers["X-Registry-Config"] = Buffer.from(JSON.stringify(config)).toBase64();
-        }
+        // if (this.authConfig || extendAuthConfig) {
+        //     const config = extendAuthConfig || {};
+        //     if (this.authConfig)
+        //         config[this.authConfig.serveraddress] = {
+        //             username: this.authConfig.username,
+        //             password: this.authConfig.password,
+        //         };
+        //     headers["X-Registry-Config"] = Buffer.from(JSON.stringify(config)).toBase64();
+        // }
 
         try {
             const requestUrl = `/build?` + objectToQuery(options, {}, ["buildargs", "labels"]);
+            let response;
             if (!options.remote) {
-                if (!options.tarPath)
+                if (!options.contextPath)
                     throw new MissingTarPath();
-                const file = fs.createReadStream(options.tarPath);
-                await this.api.post<ImageSummary[]>(
+                const file = archiver('tar').directory(options.contextPath, false);
+                file.finalize();
+                response = await this.api.post<ReadableStream<Buffer>>(
                     requestUrl,
                     file,
                     {
                         headers,
-                        timeout: 0
+                        timeout: 0,
+                        responseType: "stream",
                     }
                 );
-            } else {
+            } else if (options.remote) {
                 let file: fs.ReadStream | undefined = undefined;
-                if (options.tarPath)
-                    file = fs.createReadStream(options.tarPath);
-                await this.api.post(
+                if (options.contextPath)
+                    file = fs.createReadStream(options.contextPath);
+                response = await this.api.post<ReadableStream<Buffer>>(
                     requestUrl,
                     file || {},
                     {
@@ -109,14 +114,35 @@ export class Image {
 
                     }
                 );
+            } else throw new Error();
+            for await (const data of response.data) {
+                const lines = data.toString()
+                    .split("\n")
+                    .map(val => val.replace('\\n', ''))
+                    .filter((val) => !!val && val != '');
+                for (const line of lines)
+                    try {
+                        yield JSON.parse(line);
+                    } catch {
+                        yield { stream: line };
+                    }
             }
         } catch (err) {
             if (axios.isAxiosError(err)) {
-                const message = err.response?.data.message || err.message;
+                let error = "";
+                if (err.response?.data)
+                    for await (const message of err.response.data)
+                        error += message.toString?.() || message;
+                try {
+                    const obj = JSON.parse(error);
+                    error = obj['message'];
+                } catch {
+                    //
+                }
                 if (err.status == 400)
-                    throw new BadParameter(message);
+                    throw new BadParameter(error);
                 else if (err.status == 500)
-                    throw new APIError(message);
+                    throw new APIError(error);
             }
             throw err;
         }

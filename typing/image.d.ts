@@ -162,7 +162,7 @@ export interface BuildOption {
     /** Path within the build context to the `Dockerfile`. This is ignored if `remote` is specified and points to an external `Dockerfile`. */
     dockerfile?: string,
     /** A name and optional tag to apply to the image in the `name:tag` format. If you omit the tag the default `latest` value is assumed. */
-    t?: `${string}:${string}`,
+    t?: string,
     /** Extra hosts to add to /etc/hosts */
     extrahosts?: string,
     /** A Git repository URI or HTTP/HTTPS context URI. If the URI points to a single text file, the file’s contents are placed into a file called `Dockerfile` and the image is built from that file. If the URI points to a tarball, the file is downloaded by the daemon and the contents therein used as the context for the build. If the URI points to a tarball and the `dockerfile` parameter is also specified, there must be a file with the corresponding path inside the tarball. */
@@ -221,8 +221,8 @@ export interface BuildOption {
      * @see https://github.com/moby/buildkit
      */
     version?: "1" | "2",
-    /** The tar archive contain context to build the image */
-    tarPath?: string,
+    /** The path to context to build the image */
+    contextPath?: string,
 }
 
 /* Delete builder cache */
