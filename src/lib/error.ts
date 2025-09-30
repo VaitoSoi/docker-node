@@ -156,7 +156,7 @@ export class InvalidURL extends Error {
     }
 }
 
-export class NotSupportedVerssion extends Error {
+export class NotSupportedVersion extends Error {
     constructor(public version: string) {
         super(`version ${version} is not supported`);
     }
