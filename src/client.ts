@@ -1,6 +1,6 @@
 import type { AxiosInstance } from "axios";
 import type { DockerClientOption } from "../typing/client";
-import { InvalidURL, MissingURL, NotSupportedVerssion } from "./lib/error";
+import { InvalidURL, MissingURL, NotSupportedVersion } from "./lib/error";
 import { Container } from "./components/container";
 import { Image } from "./components/image";
 import { Network } from "./components/network";
@@ -38,7 +38,7 @@ export class DockerClient {
     public readonly plugins: Plugin;
     public readonly systems: System;
 
-    private readonly versionRegex = /^(.+)v[0-9.]+\/?$/;
+    private readonly versionRegex = /^(?:.+)v([0-9.]+)\/?$/;
 
     constructor(option: DockerClientOption) {
         let agent: https.Agent | undefined;
@@ -75,7 +75,6 @@ export class DockerClient {
         this.images = new Image(this.api, option.auth);
         this.networks = new Network(this.api);
         this.volumes = new Volume(this.api);
-        this.swarms = new Swarm(this.api);
         this.exec = new Exec(this.api);
         this.swarms = new Swarm(this.api);
         this.nodes = new Node(this.api);
@@ -124,7 +123,7 @@ export class DockerClient {
     /** Check version support */
     public static versionChecker(version: string, suppressWarning: boolean = false) {
         if (lt(version, DockerClient.MIN_API_VERSION))
-            throw new NotSupportedVerssion(version);
+            throw new NotSupportedVersion(version);
         if (version !== DockerClient.API_VERSION && !suppressWarning)
             console.warn(`this client is built on v${DockerClient.API_VERSION}, you provided v${version}`);
     }
