@@ -12,7 +12,8 @@ import type {
     PruneContainerFilter,
     PruneContainer,
     ContainerSummary,
-    CreateContainerParam
+    CreateContainerParam,
+    ContainerProcess
 } from "../../typing/container";
 import {
     APIError,
@@ -170,9 +171,9 @@ export class Container {
      * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Container/operation/ContainerTop
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    public async top(id: string, ps_args: string = "-ef") {
+    public async top(id: string, ps_args: string = "-ef"): Promise<ContainerProcess> {
         try {
-            const response = await this.api.get(`/containers/${id}/top?` + objectToQuery({ ps_args }));
+            const response = await this.api.get<ContainerProcess>(`/containers/${id}/top?` + objectToQuery({ ps_args }));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error)) {
@@ -242,9 +243,12 @@ export class Container {
      * @param id ID or name of the container
      * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Container/operation/ContainerStats
      */
-    public async stats(id: string): Promise<ContainerUsage> {
+    public async stats(id: string, options: {
+        stream?: boolean,
+        "one-shot"?: boolean
+    } = { stream: false }): Promise<ContainerUsage> {
         try {
-            const response = await this.api.get<ContainerUsage>(`/containers/${id}/stats`);
+            const response = await this.api.get<ContainerUsage>(`/containers/${id}/stats?` + objectToQuery(options));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error)) {
@@ -520,7 +524,7 @@ export class Container {
     public async pathStat(id: string, path: string): Promise<object> {
         try {
             const response = await this.api.head(`/containers/${id}/archive?` + objectToQuery({ path }));
-            const rawData = response.headers["X-Docker-Container-Path-Stat"];
+            const rawData = response.headers["x-docker-container-path-stat"];
             const decodedData = Buffer.from(rawData, "base64").toString();
             return JSON.parse(decodedData);
         } catch (error) {
