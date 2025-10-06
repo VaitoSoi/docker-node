@@ -11,7 +11,35 @@ If you find any mistyping object or response, [open an issue here](https://githu
 
 This is a simple Docker Engine API wrapper, use Axios as backbone.
 
-## II. API
+## II. Install
+
+To install this package, pick your favorite package manager and run the following command.
+
+### 1. NPM
+
+```bash
+npm install @vaitosoi/docker-node
+```
+
+### 2. Bun
+
+```bash
+bun add @vaitosoi/docker-node
+```
+
+### 3. Yarn
+
+```bash
+yarn add @vaitosoi/docker-node
+```
+
+### 4. PNPM
+
+```bash
+pnpm add @vaitosoi/docker-node
+```
+
+## III. API
 
 ### DockerClient
 
@@ -27,13 +55,15 @@ Create DockerClient instance
 
 + `socketPath` string 
 
-    A path for the Docker Unix socket. It's usually `/var/run/docker.sock`.
+    A path for the Docker Unix socket.
+
+    It's usually `/var/run/docker.sock`. Run `docker context inspect` to know where it is.
 
 + `version` string
 
     API version.
 
-    **Current API version:** v1.51
+    **Supported API version:** v1.51
 
 + `auth` object
 
@@ -73,15 +103,19 @@ Create DockerClient instance
 
         Shared passphrase used for a single private key and/or a PFX.
 
-**Note:** These options are exclusive:
+**Note:** 
 
-+ `url` and `socketPath`, `version` 
++ These options are exclusive:
 
-    To specify API version using URL, put it at the end (ex: `http://localhost:2375/v1.51`)
+    + `url` and `socketPath`, `version` 
 
-+ `cert` and `certPath`
+        To specify API version using URL, put it at the end (ex: `http://localhost:2375/v1.51`)
 
-+ `key` and `keyPath`
+    + `cert` and `certPath`
+
+    + `key` and `keyPath`
+
++ The version string has to follow this pattern: `v1.<number>`
 
 #### fromEnv(options)
 
@@ -102,6 +136,8 @@ Create a DockerClient instance using default value (`/var/run/docker.sock` for D
 + `suppressWarning` boolean
 
     Suppress version warning.
+
+**Note** This method will prefer the Docker socket file. If it dont find any, it will use URL (if allowed).
 
 #### api
 
@@ -161,4 +197,4 @@ System components
 
 **Note** Each endpoint (function) in each component is documented and has a `@see` component link to the corresponding endpoint in Docker Docs. Im just too lazy to list them here again ;-;
 
-## [III. Demo](./demo/README.md)
+## [IV. Demo](./demo/README.md)
