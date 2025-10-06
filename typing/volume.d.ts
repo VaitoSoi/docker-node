@@ -137,10 +137,10 @@ export interface VolumeObject {
  * List
  */
 export interface ListVolumeFilter {
-    dangling: boolean,
-    driver: string,
-    label: string,
-    name: string
+    dangling?: boolean,
+    driver?: string,
+    label?: string,
+    name?: string
 }
 
 export interface ListVolumeResponse {
@@ -157,13 +157,13 @@ export interface CreateVolumeOption {
     /** The new volume's name. If not specified, Docker generates a name. */
     Name: string,
     /** Name of the volume driver to use. */
-    Driver: string,
+    Driver?: string,
     /** A mapping of driver options and values. These options are passed directly to the driver and are driver specific. */
-    DriverOpts: StringObject,
+    DriverOpts?: StringObject,
     /** User-defined key/value metadata. */
-    Labels: StringObject[],
+    Labels?: StringObject,
     /** Cluster-specific options used to create the volume. */
-    ClusterVolumeSpec: ClusterVolumeSpec
+    ClusterVolumeSpec?: ClusterVolumeSpec
 }
 
 /* 

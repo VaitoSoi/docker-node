@@ -442,7 +442,7 @@ export class Image {
         filters?: ImageSearchFilter
     }): Promise<ImageSearchResponse[]> {
         try {
-            const reponse = await this.api.delete<ImageSearchResponse[]>(
+            const reponse = await this.api.get<ImageSearchResponse[]>(
                 `/images/search?` + objectToQuery(options, {}, ['filters'])
             );
             return reponse.data;
@@ -568,11 +568,11 @@ export class Image {
          *
          * Example: `{"os": "linux", "architecture": "arm", "variant": "v5"}`
          */
-        platform: StringObject,
+        platform?: StringObject,
     }) {
         try {
             const response = await this.api.get(
-                `/images/${id}/get?` + objectToQuery(option, {}, ['platform']),
+                `/images/${id}/get?` + objectToQuery(option, {}, ['platform'], ['path']),
                 {
                     responseType: 'stream'
                 }

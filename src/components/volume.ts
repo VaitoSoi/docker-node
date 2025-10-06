@@ -10,7 +10,7 @@ export class Volume {
     /**
      * @see https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Volume/operation/VolumeList
      */
-    public async list(filter: ListVolumeFilter): Promise<VolumeObject[]> {
+    public async list(filter?: ListVolumeFilter): Promise<VolumeObject[]> {
         try {
             const response = await this.api.get<VolumeObject[]>(`/volumes?` + objectToQuery({ filter }, {}, ['filter']));
             return response.data;
@@ -122,7 +122,7 @@ export class Volume {
      */
     public async prune(filter: PruneVolumeFilter): Promise<PruneVolumeResponse> {
         try {
-            const response = await this.api.delete<PruneVolumeResponse>(`/volumes/prune?` + objectToQuery({ filter }, {}, ['filter']));
+            const response = await this.api.post<PruneVolumeResponse>(`/volumes/prune?` + objectToQuery({ filter }, {}, ['filter']));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error)) {
