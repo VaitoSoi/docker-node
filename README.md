@@ -160,3 +160,5 @@ Plugin components
 System components
 
 **Note** Each endpoint (function) in each component is documented and has a `@see` component link to the corresponding endpoint in Docker Docs. Im just too lazy to list them here again ;-;
+
+## [III. Demo](./demo/README.md)
