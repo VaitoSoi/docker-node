@@ -102,7 +102,7 @@ export class DockerClient {
 
         try {
             await axios.get(`http://localhost/v${option?.version || DockerClient.API_VERSION}/info`, { socketPath: "/var/run/docker.sock" });
-            return new DockerClient({ socketPath: "/var/run/docker.sock" });
+            return new DockerClient({ socketPath: "/var/run/docker.sock", suppressWarning: option?.suppressWarning });
         } catch (error) {
             if (!axios.isAxiosError(error))
                 throw error;
@@ -111,7 +111,7 @@ export class DockerClient {
         if (!option?.useHttp) return undefined;
         try {
             await axios.get(`http://localhost:2375/v${option?.version || DockerClient.API_VERSION}/info`);
-            return new DockerClient({ socketPath: "/var/run/docker.sock" });
+            return new DockerClient({ url: `http://localhost:2375/v${option?.version || DockerClient.API_VERSION}`, suppressWarning: option?.suppressWarning });
         } catch (error) {
             if (!axios.isAxiosError(error))
                 throw error;
